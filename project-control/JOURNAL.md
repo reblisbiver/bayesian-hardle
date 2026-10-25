@@ -334,3 +334,26 @@ posterior update and normalization algorithms, entropy and information-gain
 formulas, planner recursion/cache semantics, policy behavior, benchmark
 protocol, and experiment acceptance gates remain unspecified or
 unimplemented for later reviewed issues.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-003 component scaffold — accepted
+
+Status: ACCEPTED
+
+SUPERVISOR independently re-read the corrected component interfaces and tests and reran the verification suite. The three previous blockers are resolved:
+- `BeliefState` explicitly carries immutable posterior probability mass `b(w)`.
+- Information contracts explicitly carry per-feedback outcome probability plus resulting posterior, and entropy is defined over a belief state.
+- `BayesOptimalPlanner` explicitly consumes the shared `FeedbackEngine` and `PosteriorUpdater` boundaries for hypothetical lookahead.
+
+Independent verification evidence:
+- full unittest suite: 9 tests passed;
+- compileall: passed;
+- package/import contract check: passed;
+- `git diff --check` on the correction and full ISSUE-003 range: passed;
+- scope scan found no numeric entropy/IG, Bellman, MCTS, ML, or policy algorithm implementation;
+- worktree status was clean at corrected executor checkpoint `60d3c73`.
+
+Acceptance boundary:
+This accepts only the architecture/component scaffold and interface handoff. It does not accept or define Hardle feedback semantics, repeated-letter rules, posterior update algorithms, entropy/IG arithmetic, Bellman recursion, policy behavior, or experiment results.
+
+Next milestone:
+Return to the deferred Hardle-mechanics specification issue before implementing the Feedback Engine.

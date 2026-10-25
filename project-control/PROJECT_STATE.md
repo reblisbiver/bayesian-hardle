@@ -9,11 +9,11 @@ Build and study a correct, testable, and interpretable Bayesian Hardle solver be
 
 ## Current research question
 
-Define the exact Hardle game mechanics and feedback semantics required for a valid Bayesian inference engine.
+Define the exact Hardle game mechanics and feedback semantics required to populate the accepted Bayesian component scaffold with correct behavior.
 
 ## Current milestone
 
-Project control plane accepted; next milestone is formal Hardle mechanics definition before any feedback-engine implementation.
+Bayesian Hardle component/interface scaffold accepted; next milestone is formal Hardle mechanics definition before any FeedbackEngine implementation.
 
 ## Confirmed decisions
 
@@ -31,11 +31,12 @@ Project control plane accepted; next milestone is formal Hardle mechanics defini
 
 ## Current Bayesian formulation
 
-Not yet defined.
+The accepted scaffold is organized into five groups: Game Model, Bayesian Belief Engine, Information Engine, Decision Engine, and Evaluation & Experiment System. `BeliefState` explicitly carries posterior probability mass; information outcomes carry feedback probability plus resulting posterior; finite-horizon decision state is belief plus remaining guesses. Numeric inference, information calculations, and planning behavior remain unimplemented.
 
 ## Accepted implementations
 
 - Project control plane and repository scaffold from ISSUE-001.
+- Five-group Bayesian Hardle component/interface scaffold from ISSUE-003, including shared game/belief semantics boundaries and typed information/decision/evaluation contracts.
 
 ## Accepted experiments
 
@@ -43,7 +44,7 @@ None.
 
 ## Active issue
 
-Next issue to execute: define Hardle mechanics and feedback semantics before implementation of the feedback engine.
+Resume the deferred Hardle-mechanics specification: define exact feedback semantics and game rules before implementing the Feedback Engine.
 
 ## Open questions
 
@@ -61,6 +62,6 @@ None recorded.
 
 None recorded.
 
-## Current verified Git checkpoint
+## Current verified implementation checkpoint
 
-`9218709a99d560c851b3015d88b789a93830c289` on `codex/issue-001-control-plane`, independently reverified by SUPERVISOR with clean status, passing tests, compile/import checks, `git diff --check`, and `git fsck --full`.
+Corrected ISSUE-003 executor checkpoint `60d3c73` on `codex/issue-003-component-scaffold`, independently verified by SUPERVISOR with 9 passing tests, compile/import checks, full-range `git diff --check`, and scope audit.
