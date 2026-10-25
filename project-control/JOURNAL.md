@@ -373,3 +373,127 @@ Executor must implement `project-control/issues/ISSUE-004-exact-bayesian-core-an
 The settled path is: exact Hardle feedback semantics → exact Bayesian prior/posterior → entropy/information gain → Random/MAP/Max-IG baselines → exact finite-horizon Bayes-optimal planning on a tractable small vocabulary → first controlled experiment.
 
 Do not reopen settled theory unless implementation evidence exposes a contradiction that would change the research definition. Do not use the leaked Hardle scheduled-answer set as solver knowledge. Use TDD, isolated worktree/branch execution, and verification-before-completion. Return READY_FOR_REVIEW with reproducible experiment artifacts and evidence; do not claim supervisor acceptance.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-004 exact Bayesian core and first experiment
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Branch:
+`codex/issue-004-exact-bayesian-core`
+
+Base SHA:
+`e9fd532be913d287745c0d80721a0297f226a0a5`
+
+Result SHA:
+`14c462d` (`Implement exact Bayesian Hardle core and first experiment`)
+
+What changed:
+- Implemented duplicate-aware Hardle feedback as `(exact-position,
+  present-but-wrong-position)` using exact-first residual multiplicity
+  matching, plus win/guess-limit terminal rules.
+- Vendored the supervisor-specified asweigart legal-guess source (12,972
+  base words), added exactly `covid` and `padel` to produce 12,974 legal
+  guesses, and vendored the specified 2,315-word original answer list.
+  Provenance and SHA256 values are in `data/wordlists/provenance.json`.
+- Implemented uniform prior, immutable normalized deterministic posterior
+  filtering, explicit zero-mass observation rejection, exact outcome
+  partitions, Shannon entropy, expected posterior entropy, and information
+  gain.
+- Implemented seeded Random, MAP, Max-IG, and exact finite-horizon
+  Bayes-optimal planning with canonical belief/horizon memoization. The
+  planner reuses the shared FeedbackEngine and PosteriorUpdater contracts.
+- Implemented leakage-safe episode evaluation and machine-readable results.
+  The current Hardle scheduled-answer membership is not vendored and is not
+  solver knowledge.
+
+Verification:
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 29 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests experiments scripts` — passed.
+- Package wildcard import check — passed.
+- `git diff --check` — passed before commit.
+- Vendored-input/provenance validation — base 12,972, legal 12,974,
+  candidates 2,315, source hashes matched, and `covid`/`padel` absent from
+  candidate answers.
+
+Experiment command:
+`PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 experiments/issue_004_first_experiment.py`
+
+Experiment evidence:
+- Full scope: 12,974 legal guesses, 2,315 candidate answers, 10 guesses.
+  Random completed 2,315/2,315 episodes with solve rate 2/2,315 =
+  0.000864 and mean guesses 9.998272. MAP completed 2,315/2,315 with
+  solve rate 1.000000 and mean guesses 5.360259.
+- Full Max-IG was attempted on the same full legal scope, not a reduced
+  vocabulary. With the declared 30-second budget it completed 0/2,315
+  episodes, evaluated 6,282 guesses, and stopped at 30.001 seconds. This is
+  the measured scaling limit, not a completed full Max-IG comparison.
+- Small scope: five candidate answers, ten legal guesses including the two
+  Hardle additions, three guesses, five requested episodes. Random solved
+  1/5 (0.2) with mean 2.6 guesses; MAP solved 5/5 with mean 2.2; Max-IG
+  solved 0/5 with mean 3.0; exact Bayes-optimal solved 5/5 with mean 3.0.
+  The planner recorded 192 cache hits and 29 misses.
+- Machine-readable output is
+  `experiments/results/issue_004_first_experiment.json`; the human summary
+  is `experiments/results/issue_004_first_experiment_summary.md`.
+
+Scope and acceptance boundary:
+- `PROJECT_STATE.md` was not modified. This report leaves the repository at
+  `READY_FOR_REVIEW`; no research milestone or experiment is accepted here.
+- Evidence is limited to local behavior tests, compile/import checks, and
+  executor-local reproducible experiments. No live, external, or supervisor
+  acceptance is claimed.
+- Full exact Bayes-optimal planning remains intentionally restricted to the
+  declared small vocabulary. Full Max-IG remains incomplete at the measured
+  budget and must not be described as a full comparison result.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-004 provenance and shared-updater audit correction
+
+Status: READY_FOR_REVIEW (follow-up executor evidence; supervisor acceptance is not claimed)
+
+Branch:
+`codex/issue-004-exact-bayesian-core`
+
+Base SHA:
+`14c462d` (prior ISSUE-004 implementation checkpoint)
+
+Result SHA:
+`b90f8b8` (follow-up implementation/artifact checkpoint immediately before
+this append-only record)
+
+What changed:
+- Pinned the legal-guess source to the immutable `asweigart/wordletools`
+  revision `b03237c95a2b909226ef4d9ed195d41acf40490f` and the answer source to
+  the immutable Gist raw revision `50838083dca5359b3cacf1ab677059b40c0e025e`.
+- Added SHA256 checks to `scripts/fetch_wordlists.py` and a regression test for
+  immutable provenance URLs. The cached input remains 12,972 base words plus
+  the two declared Hardle legal additions (`covid`, `padel`) = 12,974 legal
+  guesses, with 2,315 candidate answers.
+- Wired the full and small Max-IG experiment runs through one shared
+  `ExactOutcomePartitioner(updater)`, making PosteriorUpdater reuse explicit.
+- Regenerated the machine-readable and Markdown experiment artifacts after
+  this wiring change and added the implementation plan under
+  `docs/superpowers/plans/`.
+
+Fresh verification:
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 30 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests experiments scripts` — passed.
+- Package wildcard import/version check — passed.
+- Vendored-input count, subset, SHA256, and pinned-URL audit — passed.
+- `git diff --check` — passed.
+- Fresh experiment command — completed with full Random/MAP and small Random/MAP/Max-IG/exact-planner results; full Max-IG used the complete legal scope and stopped at the declared 30-second budget after 591 guess evaluations.
+
+Current experiment evidence:
+- Full Random: 2/2,315 solved (solve rate 0.000864), mean guesses 9.998272.
+- Full MAP: 2,315/2,315 solved (solve rate 1.000000), mean guesses 5.360259.
+- Full Max-IG: 0/2,315 completed before the 30-second budget; this is a
+  scaling measurement, not a completed full-vocabulary comparison.
+- Small scope: Random 1/5, MAP 5/5, Max-IG 0/5, exact Bayes-optimal 5/5;
+  the planner recorded 192 cache hits and 29 misses.
+
+Evidence boundary and remaining unknowns:
+`PROJECT_STATE.md` was not modified. The implementation, tests, and
+experiments remain executor-local evidence pending independent supervisor
+review. Full exact Bayes-optimal planning is intentionally limited to the
+declared small vocabulary, and full Max-IG remains incomplete at the measured
+budget. No scheduled-answer membership was vendored or supplied to the
+solver.
