@@ -1,8 +1,9 @@
 from dataclasses import is_dataclass
+import inspect
 from pathlib import Path
 import sys
 import unittest
-from typing import Protocol
+from typing import Protocol, get_type_hints
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -90,6 +91,79 @@ class ComponentContractTests(unittest.TestCase):
         self.assertEqual(config.benchmark, benchmark)
         with self.assertRaises(ValueError):
             DecisionState(belief=belief, remaining_guesses=-1)
+
+    def test_belief_state_carries_immutable_probability_mass(self):
+        belief = BeliefState(
+            candidates=("cigar", "rebut"),
+            probability_mass=(("cigar", 0.7), ("rebut", 0.3)),
+        )
+
+        self.assertEqual(
+            belief.probability_mass,
+            (("cigar", 0.7), ("rebut", 0.3)),
+        )
+        self.assertIsInstance(belief.probability_mass, tuple)
+        with self.assertRaises(AttributeError):
+            belief.probability_mass = (("cigar", 1.0),)
+
+    def test_information_contract_carries_outcome_probability_and_posterior(self):
+        from bayesian_hardle import OutcomeBranch, OutcomeDistribution
+
+        posterior = BeliefState(
+            candidates=("cigar",),
+            probability_mass=(("cigar", 1.0),),
+        )
+        branch = OutcomeBranch(
+            outcome=("opaque-feedback",),
+            probability=0.7,
+            posterior=posterior,
+        )
+        distribution = OutcomeDistribution(outcomes=[branch])
+
+        self.assertEqual(distribution.outcomes, (branch,))
+        self.assertEqual(distribution.outcomes[0].probability, 0.7)
+        self.assertIs(distribution.outcomes[0].posterior, posterior)
+        self.assertIsNot(distribution.outcomes, [branch])
+        with self.assertRaises(AttributeError):
+            distribution.outcomes = ()
+
+        partition_return = get_type_hints(OutcomePartitioner.partition)["return"]
+        self.assertIs(partition_return, OutcomeDistribution)
+        self.assertEqual(
+            tuple(inspect.signature(EntropyCalculator.calculate).parameters),
+            ("self", "belief"),
+        )
+        self.assertEqual(
+            tuple(
+                inspect.signature(ExpectedEntropyCalculator.calculate).parameters
+            ),
+            ("self", "distribution"),
+        )
+        self.assertEqual(
+            tuple(
+                inspect.signature(InformationGainCalculator.calculate).parameters
+            ),
+            ("self", "belief", "guess", "outcome_distribution"),
+        )
+
+    def test_bayes_optimal_planner_requires_shared_semantics_contracts(self):
+        parameters = tuple(
+            inspect.signature(BayesOptimalPlanner.select_guess).parameters
+        )
+        self.assertEqual(
+            parameters,
+            (
+                "self",
+                "state",
+                "candidate_guesses",
+                "feedback_engine",
+                "posterior_updater",
+            ),
+        )
+
+        type_hints = get_type_hints(BayesOptimalPlanner.select_guess)
+        self.assertIs(type_hints["feedback_engine"], FeedbackEngine)
+        self.assertIs(type_hints["posterior_updater"], PosteriorUpdater)
 
     def test_scaffold_handoff_keeps_game_belief_and_evaluation_boundaries(self):
         class FakeVocabularyRepository:

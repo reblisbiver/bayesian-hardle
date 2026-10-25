@@ -2,10 +2,30 @@
 
 from __future__ import annotations
 
-from typing import Mapping, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Protocol, Tuple, runtime_checkable
 
 from .belief import BeliefState
 from .game import FeedbackEngine
+
+
+@dataclass(frozen=True)
+class OutcomeBranch:
+    """Opaque feedback outcome with its probability and resulting belief."""
+
+    outcome: object
+    probability: float
+    posterior: BeliefState
+
+
+@dataclass(frozen=True)
+class OutcomeDistribution:
+    """Immutable collection of possible feedback/posterior branches."""
+
+    outcomes: Tuple[OutcomeBranch, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "outcomes", tuple(self.outcomes))
 
 
 @runtime_checkable
@@ -17,27 +37,23 @@ class OutcomePartitioner(Protocol):
         belief: BeliefState,
         guess: str,
         feedback_engine: FeedbackEngine,
-    ) -> Mapping[object, BeliefState]:
+    ) -> OutcomeDistribution:
         ...
 
 
 @runtime_checkable
 class EntropyCalculator(Protocol):
-    """Calculates entropy for a supplied outcome partition."""
+    """Calculates entropy for the supplied belief state."""
 
-    def calculate(self, partition: Mapping[object, BeliefState]) -> float:
+    def calculate(self, belief: BeliefState) -> float:
         ...
 
 
 @runtime_checkable
 class ExpectedEntropyCalculator(Protocol):
-    """Calculates expected entropy for a supplied belief and partition."""
+    """Calculates expected posterior entropy for an outcome distribution."""
 
-    def calculate(
-        self,
-        belief: BeliefState,
-        partition: Mapping[object, BeliefState],
-    ) -> float:
+    def calculate(self, distribution: OutcomeDistribution) -> float:
         ...
 
 
@@ -49,6 +65,6 @@ class InformationGainCalculator(Protocol):
         self,
         belief: BeliefState,
         guess: str,
-        feedback_engine: FeedbackEngine,
+        outcome_distribution: OutcomeDistribution,
     ) -> float:
         ...

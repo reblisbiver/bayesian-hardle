@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Hashable, Optional, Protocol, Sequence, runtime_checkable
 
-from .belief import BeliefState
+from .belief import BeliefState, PosteriorUpdater
+from .game import FeedbackEngine
 
 
 @dataclass(frozen=True)
@@ -67,12 +68,14 @@ class MaxInformationGainPolicy:
 
 @runtime_checkable
 class BayesOptimalPlanner(Protocol):
-    """Plans through the shared decision state and candidate boundary."""
+    """Plans through shared feedback and posterior semantics."""
 
     def select_guess(
         self,
         state: DecisionState,
         candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+        posterior_updater: PosteriorUpdater,
     ) -> str:
         ...
 

@@ -6,16 +6,25 @@ from dataclasses import dataclass
 from typing import Protocol, Sequence, Tuple, runtime_checkable
 
 
+ProbabilityMass = Tuple[Tuple[str, float], ...]
+
+
 @dataclass(frozen=True)
 class BeliefState:
-    """Immutable belief boundary with no posterior representation chosen yet."""
+    """Immutable belief boundary carrying an opaque posterior mass table."""
 
     candidates: Tuple[str, ...] = ()
     observations: Tuple[object, ...] = ()
+    probability_mass: ProbabilityMass = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidates", tuple(self.candidates))
         object.__setattr__(self, "observations", tuple(self.observations))
+        object.__setattr__(
+            self,
+            "probability_mass",
+            tuple((word, mass) for word, mass in self.probability_mass),
+        )
 
 
 @runtime_checkable

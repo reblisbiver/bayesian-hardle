@@ -22,6 +22,8 @@ from .information import (
     EntropyCalculator,
     ExpectedEntropyCalculator,
     InformationGainCalculator,
+    OutcomeBranch,
+    OutcomeDistribution,
     OutcomePartitioner,
 )
 
@@ -42,6 +44,8 @@ __all__ = [
     "MAPPolicy",
     "MaxInformationGainPolicy",
     "MetricsResult",
+    "OutcomeBranch",
+    "OutcomeDistribution",
     "OutcomePartitioner",
     "PlannerCache",
     "Policy",
