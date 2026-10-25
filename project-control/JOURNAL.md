@@ -615,3 +615,33 @@ business, or supervisor acceptance. The full Max-IG result remains incomplete
 by design and is reported only as a scaling limit. No Bayesian theory,
 hypothesis space, objective, vocabulary separation, or scheduled-answer
 knowledge boundary was changed.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-004 exact Bayesian core and first experiment — accepted
+
+Status: ACCEPTED
+
+Independent supervisor verification after the correction round confirmed the two previously blocking policy-selection defects are fixed without changing the settled Bayesian research definition.
+
+Accepted evidence:
+- Fresh full test suite: 35/35 passed.
+- Fresh compile/import and full-range `git diff --check`: passed.
+- Worktree clean at executor handoff checkpoint `9568d1b` before supervisor state update.
+- Independent supervisor traces reproduced the corrected small-scope behavior for all five targets: Max-IG and exact Bayes-optimal both select `arise` first, reduce the posterior from five candidates to one, then immediately guess the known answer on the second move.
+- Max-IG still chooses a non-answer legal guess when its information gain is strictly higher; the correction affects only ties.
+- Exact Bayes-optimal still maximizes final solve probability first; expected guesses is used only as a lexicographic secondary criterion among equal-success actions.
+- Scheduled Hardle answer membership remains excluded from solver knowledge.
+
+Accepted experiment evidence:
+- Full Random: solve rate `0.000864`, mean guesses `9.998272` over 2,315 targets.
+- Full MAP: solve rate `1.000000`, mean guesses `5.360259` over 2,315 targets.
+- Full Max-IG: incomplete within the declared 30-second budget after 603 candidate-guess evaluations; accepted only as a scaling-limit observation, not as a completed full baseline.
+- Small scope: Random `1/5`, MAP `5/5` mean `2.2`, Max-IG `5/5` mean `2.0`, exact Bayes-optimal `5/5` mean `2.0`.
+
+Acceptance boundary:
+- ISSUE-004 exact Bayesian core and first controlled experiment are accepted.
+- Full-vocabulary Max-IG performance remains unresolved because the current exact implementation is computationally too slow.
+- Full-vocabulary exact Bayes-optimal planning remains intentionally unevaluated.
+- Next milestone is engineering/scaling of exact Max-IG without changing its mathematical definition.
+
+Infrastructure note:
+- The durable bridge successfully produced the user-visible `PM_JOB_STATUS ... completed` callback and Codex exited with code 0, but the durable job JSON was observed afterward with `status: interrupted`. This is a bridge bookkeeping inconsistency, not a research-result failure, and should be corrected separately from the Hardle solver.
