@@ -187,3 +187,21 @@ Acceptance criteria:
 
 Git discipline:
 Work from the accepted checkpoint. Use an isolated semantic commit/checkpoint for ISSUE-002. Do not rewrite ISSUE-001 history.
+
+## 2026-10-25 — [OWNER DECISION] Reprioritize execution to component initialization
+
+OWNER directs the project to enter execution by initializing the accepted component architecture first. The previously dispatched Hardle-mechanics task remains historically valid but is deferred until after the component scaffold is established. No Hardle rule semantics are authorized by this reprioritization.
+
+## 2026-10-25 — [SUPERVISOR TASK] ISSUE-003 initialize Bayesian Hardle component scaffold
+
+Status: OPEN
+
+Executor must implement `project-control/issues/ISSUE-003-component-scaffold.md` using `docs/superpowers/plans/2026-10-25-component-scaffold.md` as the implementation plan.
+
+Scope is architecture initialization only: create typed module boundaries, value objects, Protocol contracts, one integration-level scaffold test using test doubles, compact architecture documentation, and an execution handoff. Do not implement real Hardle feedback semantics, Bayesian calculations, information-gain calculations, Bellman recursion, ML, RL, or MCTS.
+
+Required execution discipline:
+- Work from the accepted repository checkpoint using an isolated semantic branch/worktree.
+- Read and follow relevant Superpowers skills, including `using-git-worktrees`, `test-driven-development`, `executing-plans`, and `verification-before-completion`.
+- Do not modify or delete the OWNER's untracked figure artifacts or unrelated files.
+- Append one `[EXECUTION REPORT]` to `project-control/JOURNAL.md` and leave the result `READY_FOR_REVIEW`.
