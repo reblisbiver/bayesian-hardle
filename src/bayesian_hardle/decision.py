@@ -17,6 +17,12 @@ from .information import (
 )
 
 
+POLICY_TIE_TOLERANCE = 1e-12
+"""Absolute tolerance for policy-value ties, applied only to tie resolution."""
+
+PlannerValue = Tuple[float, float]
+
+
 @dataclass(frozen=True)
 class DecisionState:
     """Belief plus the remaining decision horizon."""
@@ -78,7 +84,7 @@ class MAPPolicy:
 
 
 class MaxInformationGainPolicy:
-    """Chooses the legal guess with maximum exact expected information gain."""
+    """Chooses maximum exact IG, then resolves ties using posterior answer mass."""
 
     def __init__(
         self,
@@ -121,7 +127,32 @@ class MaxInformationGainPolicy:
             )
             scored.append((gain, guess))
             self.evaluated_guesses += 1
-        return max(scored, key=lambda item: item[0])[1]
+        maximum_gain = max(gain for gain, _ in scored)
+        tied = [
+            (gain, guess)
+            for gain, guess in scored
+            if maximum_gain - gain <= POLICY_TIE_TOLERANCE
+        ]
+        if state.belief.probability_mass:
+            total_mass = state.belief.total_mass
+            if total_mass <= 0:
+                raise ValueError("belief must have positive total mass")
+            posterior_mass = {
+                word: mass / total_mass for word, mass in state.belief.probability_mass
+            }
+        elif state.belief.candidates:
+            uniform = 1.0 / len(state.belief.candidates)
+            posterior_mass = {word: uniform for word in state.belief.candidates}
+        else:
+            raise ValueError("belief must contain candidates")
+        answer_ties = [
+            (guess, posterior_mass[guess])
+            for _, guess in tied
+            if guess in posterior_mass
+        ]
+        if answer_ties:
+            return max(answer_ties, key=lambda item: item[1])[0]
+        return tied[0][1]
 
 
 @runtime_checkable
@@ -164,13 +195,18 @@ class InMemoryPlannerCache:
 
 
 class ExactBayesOptimalPlanner:
-    """Exact Bellman planner intended for deliberately small vocabularies."""
+    """Exact Bellman planner with solve probability as the primary objective.
+
+    Action values are ``(final solve probability, expected guesses until solve
+    or horizon termination)``.  The second component is considered only when
+    the first component ties within ``POLICY_TIE_TOLERANCE``.
+    """
 
     def __init__(self, cache: Optional[PlannerCache] = None) -> None:
         self.cache = cache if cache is not None else InMemoryPlannerCache()
         self.cache_hits = 0
         self.cache_misses = 0
-        self._value_cache: Dict[Hashable, float] = {}
+        self._value_cache: Dict[Hashable, PlannerValue] = {}
 
     @staticmethod
     def _canonical_key(
@@ -224,7 +260,7 @@ class ExactBayesOptimalPlanner:
         if state.remaining_guesses <= 0:
             return 0.0
         guess = self._best_guess(state, legal, feedback_engine, posterior_updater)
-        return self._guess_value(state, guess, legal, feedback_engine, posterior_updater)
+        return self._guess_value(state, guess, legal, feedback_engine, posterior_updater)[0]
 
     def _best_guess(
         self,
@@ -239,16 +275,24 @@ class ExactBayesOptimalPlanner:
             self.cache_hits += 1
             return cached
         self.cache_misses += 1
-        best_guess = None
-        best_value = float("-inf")
+        scored = []
         for guess in candidate_guesses:
-            value = self._guess_value(
+            success_probability, expected_guesses = self._guess_value(
                 state, guess, candidate_guesses, feedback_engine, posterior_updater
             )
-            if value > best_value + 1e-15:
-                best_value = value
-                best_guess = guess
-        assert best_guess is not None
+            scored.append((guess, success_probability, expected_guesses))
+        maximum_success = max(success for _, success, _ in scored)
+        success_ties = [
+            (guess, success, expected)
+            for guess, success, expected in scored
+            if maximum_success - success <= POLICY_TIE_TOLERANCE
+        ]
+        minimum_expected = min(expected for _, _, expected in success_ties)
+        best_guess = next(
+            guess
+            for guess, _, expected in success_ties
+            if expected - minimum_expected <= POLICY_TIE_TOLERANCE
+        )
         self.cache.put(key, best_guess)
         return best_guess
 
@@ -259,7 +303,7 @@ class ExactBayesOptimalPlanner:
         candidate_guesses: Sequence[str],
         feedback_engine: FeedbackEngine,
         posterior_updater: PosteriorUpdater,
-    ) -> float:
+    ) -> PlannerValue:
         key = ("value", self._canonical_key(state, candidate_guesses), guess)
         if key in self._value_cache:
             return self._value_cache[key]
@@ -268,10 +312,12 @@ class ExactBayesOptimalPlanner:
         for target, mass in mass_table:
             outcome = tuple(feedback_engine.evaluate(guess, target))
             grouped[outcome] = grouped.get(outcome, 0.0) + mass
-        value = 0.0
+        success_probability = 0.0
+        expected_guesses = 0.0
         for outcome, probability in grouped.items():
             if outcome == (len(guess), 0):
-                value += probability
+                success_probability += probability
+                expected_guesses += probability
             elif state.remaining_guesses > 1:
                 posterior = posterior_updater.update(state.belief, guess, outcome)
                 next_state = DecisionState(
@@ -284,12 +330,17 @@ class ExactBayesOptimalPlanner:
                     feedback_engine,
                     posterior_updater,
                 )
-                value += probability * self._guess_value(
+                next_success, next_expected = self._guess_value(
                     next_state,
                     next_guess,
                     candidate_guesses,
                     feedback_engine,
                     posterior_updater,
                 )
+                success_probability += probability * next_success
+                expected_guesses += probability * (1.0 + next_expected)
+            else:
+                expected_guesses += probability
+        value = (success_probability, expected_guesses)
         self._value_cache[key] = value
         return value
