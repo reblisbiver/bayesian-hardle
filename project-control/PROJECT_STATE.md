@@ -5,19 +5,22 @@ Executor reports and unreviewed proposals belong in `JOURNAL.md` instead.
 
 ## Final goal
 
-To be defined by OWNER and recorded after supervisor review.
+Build and study a correct, testable, and interpretable Bayesian Hardle solver before considering learned policies or reinforcement learning.
 
 ## Current research question
 
-Not yet defined.
+Define the exact Hardle game mechanics and feedback semantics required for a valid Bayesian inference engine.
 
 ## Current milestone
 
-Control-plane initialization is awaiting independent supervisor review.
+Project control plane accepted; next milestone is formal Hardle mechanics definition before any feedback-engine implementation.
 
 ## Confirmed decisions
 
-None accepted yet.
+- `project-control/` is the formal shared communication and supervision channel.
+- OWNER is not used as a message relay between SUPERVISOR and EXECUTOR.
+- Executor reports are not accepted state until independent SUPERVISOR review.
+- Bayesian core work must precede neural-network or reinforcement-learning work.
 
 ## Hard constraints
 
@@ -32,7 +35,7 @@ Not yet defined.
 
 ## Accepted implementations
 
-None.
+- Project control plane and repository scaffold from ISSUE-001.
 
 ## Accepted experiments
 
@@ -40,14 +43,15 @@ None.
 
 ## Active issue
 
-`ISSUE-001` — initialize the project control plane; executor report pending
-independent review.
+Next issue to execute: define Hardle mechanics and feedback semantics before implementation of the feedback engine.
 
 ## Open questions
 
-- What exact Bayesian Hardle research question and target behavior should be
-  formalized?
-- What feedback semantics, dataset, priors, and evaluation gates are required?
+- What are the exact legal-guess and target vocabularies?
+- What is the exact feedback alphabet and repeated-letter allocation rule?
+- What Hardle-specific rules differ from Wordle?
+- What guess limit and win condition are authoritative?
+- Which rule source should be treated as canonical for future tests?
 
 ## Deferred ideas
 
@@ -59,5 +63,4 @@ None recorded.
 
 ## Current verified Git checkpoint
 
-None accepted yet; the executor checkpoint is identified in the journal and
-awaits supervisor review.
+`9218709a99d560c851b3015d88b789a93830c289` on `codex/issue-001-control-plane`, independently reverified by SUPERVISOR with clean status, passing tests, compile/import checks, `git diff --check`, and `git fsck --full`.

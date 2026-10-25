@@ -23,4 +23,4 @@ and evidence. Research phases cannot advance automatically after executor
 completion.
 
 Status:
-PROPOSED — awaiting `[SUPERVISOR REVIEW]`.
+ACCEPTED — independently verified by SUPERVISOR on 2026-10-25.

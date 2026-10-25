@@ -124,3 +124,66 @@ Remaining unknowns:
 Supervisor must independently review ISSUE-001 before any next research
 stage. The research question, Bayesian formulation, feedback semantics, data,
 priors, and evaluation gates remain undefined.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-001 control-plane initialization
+
+Status: ACCEPTED
+
+Independent verification:
+- Read `AGENTS.md`, `project-control/README.md`, `JOURNAL.md`, `PROJECT_STATE.md`, `DECISIONS.md`, ISSUE-001, and `tests/test_project_scaffold.py` directly from the repository.
+- Confirmed branch `codex/issue-001-control-plane` and HEAD `9218709a99d560c851b3015d88b789a93830c289`.
+- Confirmed history: `82d97d9` initial scaffold -> `88fd4c0` complete execution handoff -> `9218709` final handoff metadata.
+- Fresh rerun: `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` -> 3 passed.
+- Fresh rerun: `python3 -m compileall -q src tests` -> passed.
+- Fresh import check -> `bayesian_hardle.__version__ == 0.1.0`.
+- `git diff --check` -> passed.
+- `git fsck --full` -> passed.
+- Working tree was clean before this supervisor record was written.
+
+Assessment:
+- ACCEPT the control plane, role separation, append-only journal discipline, accepted-state boundary, repository scaffold, and Git checkpoint as the canonical project governance foundation.
+- ACCEPT ISSUE-001 as the infrastructure initialization issue actually executed.
+- The original initialization prompt also expected Hardle mechanics to be defined before a feedback engine. That research work was not done in ISSUE-001. Rather than rewrite history or renumber the accepted issue, move Hardle mechanics to the next issue.
+- No Bayesian algorithm, Hardle feedback semantics, posterior model, experiment, or research conclusion is accepted yet.
+
+Decision:
+ISSUE-001 is CLOSED / ACCEPTED. The next task is a rule-definition issue only. Do not implement the feedback engine yet.
+
+## 2026-10-25 — [SUPERVISOR TASK] ISSUE-002 define Hardle mechanics and feedback semantics
+
+Status: OPEN
+
+Goal:
+Establish the exact game contract required for a correct Bayesian Hardle inference engine before any feedback-engine code is written.
+
+Required work:
+1. Create `project-control/issues/ISSUE-002-hardle-mechanics.md`.
+2. Determine and document, with evidence, the authoritative rules for:
+   - target word length;
+   - legal-guess universe versus target universe;
+   - feedback symbols/states;
+   - exact feedback-generation procedure;
+   - repeated-letter allocation semantics;
+   - win condition;
+   - guess limit;
+   - any Hardle-specific behavior that differs from standard Wordle.
+3. Separate every rule into `VERIFIED`, `INFERRED`, or `UNKNOWN`.
+4. Cite the exact source or local evidence supporting each VERIFIED rule. Do not rely on memory.
+5. Where the public Hardle implementation or rules are ambiguous, build small read-only probes or inspect authoritative implementation/source material as needed. Do not implement our solver yet.
+6. Produce a compact formal game contract suitable for direct translation into tests in the next issue.
+7. Draft, but do not execute, the next feedback-engine issue with acceptance criteria and edge-case tests, especially duplicate-letter cases.
+
+Required skill routing:
+- Read and follow the relevant local requirement/specification skill(s) before formalizing the contract.
+- Use `verification-before-completion` before claiming this issue ready for review.
+- If rule evidence conflicts or an implementation behaves unexpectedly, use `systematic-debugging` principles to isolate the discrepancy rather than choosing a rule by guesswork.
+
+Acceptance criteria:
+- A reviewer can determine exactly how feedback must be generated for every guess/target pair without relying on unstated assumptions.
+- Repeated-letter behavior is demonstrated with concrete examples sufficient to drive regression tests.
+- Any unresolved rule that could change feedback semantics is marked BLOCKER.
+- No feedback-engine implementation, Bayesian update, entropy, information gain, model training, or experiment is started.
+- EXECUTOR appends one `[EXECUTION REPORT]` with branch/base/result SHA, evidence sources, verification commands, unresolved ambiguities, and a clear `READY_FOR_REVIEW` or `BLOCKED` status.
+
+Git discipline:
+Work from the accepted checkpoint. Use an isolated semantic commit/checkpoint for ISSUE-002. Do not rewrite ISSUE-001 history.
