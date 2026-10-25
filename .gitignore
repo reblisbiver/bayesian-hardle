@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+
+# Local experiment outputs; keep manifests and intentional fixtures tracked.
+experiments/outputs/
+*.log
+.DS_Store

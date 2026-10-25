@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bayesian-hardle"
+version = "0.1.0"
+description = "Research code for Bayesian reasoning in a Hardle-style word-feedback environment"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Bayesian Hardle research team" }]
+
+[tool.setuptools.packages.find]
+where = ["src"]
