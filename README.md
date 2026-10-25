@@ -3,25 +3,29 @@
 Bayesian Hardle is a research codebase for studying Bayesian reasoning in a
 Hardle-style word-feedback environment.
 
-The repository is currently at the control-plane initialization milestone.
-The formal communication and audit records live in
-[`project-control/`](project-control/README.md). No algorithm, model, or
-experiment is accepted until a supervisor review records acceptance.
+The repository contains an executor implementation of the exact Bayesian
+core for ISSUE-004. The formal communication and audit records live in
+[`project-control/`](project-control/README.md). These local tests and
+experiments remain unaccepted until a supervisor review records acceptance.
 
 ## Layout
 
 - `src/bayesian_hardle/` — package code.
 - `tests/` — behavior-oriented tests.
 - `experiments/` — reproducible experiment inputs, runners, and outputs.
+- `data/wordlists/` — vendored supervisor-specified vocabularies plus source
+  provenance.
 - `scripts/` — small operational helpers.
 - `docs/` — research and engineering documentation.
 - `project-control/` — append-only handoffs and current accepted state.
 
 ## Component scaffold (ISSUE-003)
 
-The package currently contains typed boundaries and value objects only. It
-does not yet choose Hardle feedback rules, a posterior representation,
-entropy or information-gain formulas, or a planning algorithm.
+The package now implements the settled exact semantics: duplicate-aware
+feedback, a uniform prior, deterministic posterior filtering, Shannon
+entropy/expected posterior entropy/information gain, Random/MAP/Max-IG, and
+an exact finite-horizon planner for small vocabularies. Evaluation keeps
+hidden targets outside the solver state.
 
 | Group | Module | Public boundary |
 | --- | --- | --- |
@@ -49,5 +53,15 @@ Run the standard-library test suite from the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The project is intentionally small at this stage. Dependencies and research
-protocols will be added only when a reviewed issue requires them.
+Run the first controlled experiment with:
+
+```bash
+PYTHONPATH=src python3 experiments/issue_004_first_experiment.py
+```
+
+It writes `experiments/results/issue_004_first_experiment.json` and a short
+Markdown summary. The full Random/MAP comparison uses all 2,315 candidate
+answers and 12,974 legal guesses. Full Max-IG uses that same scope; its
+configured wall-clock limit is reported as a scaling measurement if reached,
+not replaced by a smaller vocabulary. Exact Bellman planning is deliberately
+restricted to the declared small scope.

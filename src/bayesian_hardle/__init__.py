@@ -1,11 +1,23 @@
 """Bayesian Hardle research package."""
 
-from .belief import BeliefState, LikelihoodModel, PosteriorUpdater, PriorModel
+from .belief import (
+    BeliefState,
+    DeterministicLikelihoodModel,
+    ExactPosteriorUpdater,
+    ImpossibleObservationError,
+    LikelihoodModel,
+    PosteriorUpdater,
+    PriorModel,
+    UniformPrior,
+)
 from .decision import (
     BayesOptimalPlanner,
     DecisionState,
+    ExactBayesOptimalPlanner,
+    InMemoryPlannerCache,
     MAPPolicy,
     MaxInformationGainPolicy,
+    PolicyBudgetExceeded,
     PlannerCache,
     Policy,
     RandomPolicy,
@@ -14,17 +26,33 @@ from .evaluation import (
     ArtifactSink,
     BenchmarkSpec,
     EpisodeRunner,
+    ExactEpisodeRunner,
     ExperimentConfig,
+    JsonArtifactSink,
     MetricsResult,
+    PlannerPolicyAdapter,
 )
-from .game import FeedbackEngine, GameSpec, TerminalRules, VocabularyRepository
+from .game import (
+    Feedback,
+    FeedbackEngine,
+    GameSpec,
+    HardleFeedbackEngine,
+    HardleTerminalRules,
+    TerminalRules,
+    VocabularyRepository,
+    WordListVocabularyRepository,
+)
 from .information import (
     EntropyCalculator,
+    ExactInformationGainCalculator,
+    ExactOutcomePartitioner,
     ExpectedEntropyCalculator,
+    ExpectedPosteriorEntropyCalculator,
     InformationGainCalculator,
     OutcomeBranch,
     OutcomeDistribution,
     OutcomePartitioner,
+    ShannonEntropyCalculator,
 )
 
 __all__ = [
@@ -33,13 +61,25 @@ __all__ = [
     "BeliefState",
     "BenchmarkSpec",
     "DecisionState",
+    "DeterministicLikelihoodModel",
     "EntropyCalculator",
     "EpisodeRunner",
+    "ExactBayesOptimalPlanner",
+    "ExactEpisodeRunner",
+    "ExactInformationGainCalculator",
+    "ExactOutcomePartitioner",
     "ExpectedEntropyCalculator",
+    "ExpectedPosteriorEntropyCalculator",
     "ExperimentConfig",
     "FeedbackEngine",
+    "Feedback",
     "GameSpec",
+    "HardleFeedbackEngine",
+    "HardleTerminalRules",
+    "ImpossibleObservationError",
+    "InMemoryPlannerCache",
     "InformationGainCalculator",
+    "JsonArtifactSink",
     "LikelihoodModel",
     "MAPPolicy",
     "MaxInformationGainPolicy",
@@ -51,9 +91,14 @@ __all__ = [
     "Policy",
     "PosteriorUpdater",
     "PriorModel",
+    "PlannerPolicyAdapter",
+    "PolicyBudgetExceeded",
     "RandomPolicy",
+    "ShannonEntropyCalculator",
     "TerminalRules",
+    "UniformPrior",
     "VocabularyRepository",
+    "WordListVocabularyRepository",
     "__version__",
 ]
 __version__ = "0.1.0"

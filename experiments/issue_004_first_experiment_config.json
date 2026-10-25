@@ -1,0 +1,28 @@
+{
+  "seed": 20261025,
+  "full_scope": {
+    "requested_episodes": 2315,
+    "max_ig_time_limit_seconds": 30.0
+  },
+  "small_scope": {
+    "candidate_answers": [
+      "awake",
+      "cigar",
+      "humph",
+      "rebut",
+      "sissy"
+    ],
+    "legal_guesses": [
+      "adieu",
+      "arise",
+      "awake",
+      "cigar",
+      "humph",
+      "rebut",
+      "sissy",
+      "stare"
+    ],
+    "max_guesses": 3,
+    "requested_episodes": 5
+  }
+}
