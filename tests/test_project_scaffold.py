@@ -45,7 +45,8 @@ class ProjectScaffoldTests(unittest.TestCase):
 
         self.assertIn("[OWNER DECISION]", journal)
         self.assertIn("[EXECUTION REPORT]", journal)
-        self.assertIn("IN_PROGRESS", journal)
+        self.assertIn("READY_FOR_REVIEW", journal)
+        self.assertIn("82d97d92694c178c0ed906d193a97835960c34a6", journal)
         self.assertIn("Base SHA:", journal)
         self.assertIn("Result SHA:", journal)
         self.assertIn("Evidence:", journal)

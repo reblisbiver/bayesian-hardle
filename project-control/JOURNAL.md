@@ -50,3 +50,39 @@ documents.
 Remaining unknowns:
 No supervisor audit has occurred. No implementation or experiment is
 accepted. The first checkpoint SHA is pending.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-001 control-plane initialization — final handoff
+
+Status: READY_FOR_REVIEW
+
+Branch:
+codex/issue-001-control-plane
+
+Base SHA:
+(no commit; repository was initialized from an empty state)
+
+Result SHA:
+82d97d92694c178c0ed906d193a97835960c34a6
+
+What changed:
+Created the independent repository scaffold, package metadata, local working
+agreement, append-only project-control communication layer, ISSUE-001, and a
+standard-library test covering the required layout and handoff markers. No
+Bayesian algorithm, model, experiment, or accepted research state was added.
+
+Tests:
+- `python3 -m unittest discover -s tests -v` — 3 tests passed.
+- `git diff --check` — passed with no whitespace errors.
+
+Evidence:
+- Initial RED run recorded missing required files before implementation.
+- First semantic checkpoint is commit
+  `82d97d92694c178c0ed906d193a97835960c34a6`.
+- `project-control/PROJECT_STATE.md` explicitly keeps accepted
+  implementation and experiment sections empty pending review.
+
+Remaining unknowns:
+No supervisor audit has occurred. The research question, Bayesian
+formulation, feedback semantics, data, priors, and evaluation gates remain
+undefined. Live, device, external, and business acceptance are not in scope
+and have not been verified.
