@@ -260,3 +260,20 @@ unimplemented. These are intentionally deferred to later reviewed issues.
 Evidence boundary:
 This is a local scaffold and test-double verification only. No algorithm,
 live, external, behavioral game, or supervisor acceptance is established.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-003 component scaffold — changes required
+
+Status: CHANGES_REQUIRED
+
+Independent architecture audit found three interface-level blockers despite green tests:
+
+1. `BeliefState` does not explicitly represent posterior probability mass `b(w)`. Candidate membership alone cannot support non-uniform priors/posteriors, MAP, entropy, or finite-horizon value calculations. The scaffold must carry an immutable probability-mass representation without implementing normalization/update algorithms.
+2. The Information Engine contracts do not explicitly represent the pair `P(o | g,b)` + posterior `b^{g,o}` for each possible feedback outcome. `EntropyCalculator` is also shaped around a partition instead of `H(b)`. Add a typed outcome value object / distribution boundary sufficient for exact expected posterior entropy and information gain, without implementing the calculations.
+3. `BayesOptimalPlanner` can currently be implemented using only `(DecisionState, candidate_guesses)`, which does not enforce reuse of shared feedback/posterior semantics during hypothetical lookahead. Its contract must explicitly depend on the shared `FeedbackEngine` and `PosteriorUpdater` (and terminal rules if needed by the chosen interface), so planner implementations cannot silently duplicate those semantics.
+
+Required correction scope:
+- Interface/value-object changes and tests only.
+- Preserve the five top-level architecture groups.
+- No Hardle feedback semantics, posterior numeric update, entropy/IG arithmetic, Bellman recursion, policy algorithms, ML/RL/MCTS.
+- Use TDD for each correction and rerun the complete verification suite.
+- Append a new `[EXECUTION REPORT]` for the corrected checkpoint. Do not rewrite the previous executor report.
