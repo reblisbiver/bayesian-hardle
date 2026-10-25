@@ -529,3 +529,89 @@ Acceptance boundary:
 - The Bayesian inference/information core is not being rejected; required changes are confined to policy tie resolution and regeneration of affected experiment artifacts/tests.
 - `PROJECT_STATE.md` remains unchanged.
 - No follow-up executor task is dispatched by this review.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-004 policy tie-handling correction round
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Branch:
+`codex/issue-004-exact-bayesian-core`
+
+Base SHA:
+`6e9b0624e896d6f74cab0a5de200c8e8264616c4`
+
+Result SHA:
+`8c3d83e47f6e8ee09af364537a8e11a8aa187d3c`
+
+What changed:
+- Max-IG still maximizes exact information gain first. The documented absolute
+  policy tie tolerance is `POLICY_TIE_TOLERANCE = 1e-12`. Within that IG tie,
+  it selects the remaining legal candidate answer with greatest posterior
+  probability; exact remaining ties preserve the supplied legal-guess order.
+- Exact Bayes-optimal planning now evaluates each action with the pair
+  `(final solve probability, expected guesses until solve or horizon
+  termination)`. The first component is maximized first; the second is used
+  only when the first ties within the same tolerance. This is not a MAP
+  replacement and does not trade away solve probability.
+- Added acceptance/regression coverage for singleton Max-IG, controlled
+  equal-IG candidate-vs-non-answer ties, deterministic non-answer fallback,
+  equal-success planner ties, planner singleton behavior, and existing
+  planner success-probability cases.
+- Regenerated the existing machine-readable and human-readable experiment
+  artifacts. `PROJECT_STATE.md` was not modified.
+
+Fresh verification:
+- TDD red phase: the three new defect tests failed on the untouched base
+  (Max-IG candidate tie, Max-IG singleton, planner equal-success tie).
+- TDD green phase: targeted decision suite — 10 tests passed.
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 35 tests passed.
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests experiments scripts` — passed.
+- Package import/version and exported tolerance check — passed (`0.1.0`, `1e-12`).
+- `git diff --check` — passed; the implementation/artifact checkpoint was clean before this append-only report.
+
+Fresh experiment configuration:
+- Seed `20261025`; word length 5; horizon 10; uniform prior; 12,974 legal
+  guesses and 2,315 candidate answers; no scheduled Hardle answer membership
+  was supplied to the solver.
+- Small scope: five candidate answers, ten legal guesses after the declared
+  Hardle legal additions, horizon 3, five requested target episodes.
+- Full Max-IG retained the existing 30-second bounded scaling attempt; no
+  optimization or reduced full scope was introduced.
+
+Fresh experiment results:
+
+| Scope | Policy | Completed / requested | Solve rate | Mean guesses | Runtime (s) | Stop/evidence |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| full | Random | 2315 / 2315 | 0.000864 | 9.998272 | 11.570 | completed |
+| full | MAP | 2315 / 2315 | 1.000000 | 5.360259 | 13.974 | completed |
+| full | Max-IG | 0 / 2315 | 0.000000 | 0.000000 | 30.039 | bounded after 603 evaluations; scaling measurement only |
+| small | Random | 5 / 5 | 0.200000 | 2.600000 | 0.000120 | completed |
+| small | MAP | 5 / 5 | 1.000000 | 2.200000 | 0.000093 | completed |
+| small | Max-IG | 5 / 5 | 1.000000 | 2.000000 | 0.003161 | completed |
+| small | Exact-Bayes-optimal | 5 / 5 | 1.000000 | 2.000000 | 0.003292 | completed |
+
+Plain-language small-scope traces (targets in order `awake`, `cigar`,
+`humph`, `rebut`, `sissy`):
+- Random: `padel,padel,cigar`; `cigar`; `stare,rebut,arise`;
+  `padel,humph,awake`; `awake,adieu,humph`. Only `cigar` solved within the
+  three-guess horizon.
+- MAP: `awake`; `awake,cigar`; `awake,humph`; `awake,cigar,rebut`;
+  `awake,humph,sissy`. All five solved.
+- Max-IG: every target first used `arise`, which reduced the posterior from
+  five candidates to one, then guessed that sole answer immediately. The
+  feedback was `(2,0)`, `(0,3)`, `(0,0)`, `(0,2)`, and `(1,1)` respectively;
+  all five solved in two guesses.
+- Exact-Bayes-optimal followed the same two-step traces on this controlled
+  scope: `arise`, then the now-unique answer for each target. Its equal-value
+  alternatives no longer spend the final extra guess.
+
+Artifacts:
+- `experiments/results/issue_004_first_experiment.json`
+- `experiments/results/issue_004_first_experiment_summary.md`
+
+Evidence boundary and remaining scope:
+These are fresh executor-local tests and experiments, not live, physical,
+business, or supervisor acceptance. The full Max-IG result remains incomplete
+by design and is reported only as a scaling limit. No Bayesian theory,
+hypothesis space, objective, vocabulary separation, or scheduled-answer
+knowledge boundary was changed.
