@@ -205,3 +205,58 @@ Required execution discipline:
 - Read and follow relevant Superpowers skills, including `using-git-worktrees`, `test-driven-development`, `executing-plans`, and `verification-before-completion`.
 - Do not modify or delete the OWNER's untracked figure artifacts or unrelated files.
 - Append one `[EXECUTION REPORT]` to `project-control/JOURNAL.md` and leave the result `READY_FOR_REVIEW`.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-003 component scaffold
+
+Status: READY_FOR_REVIEW (awaiting supervisor review; no supervisor
+acceptance is claimed)
+
+Branch:
+codex/issue-003-component-scaffold
+
+Base SHA:
+37d48455b778d0189a0856ccdbd10099d0be3d1a
+
+Result SHA:
+9a5c0586088ccac5d37663c228b6fd4f4c06cde3 (implementation and documentation
+checkpoint immediately before this append-only handoff record)
+
+Changed files:
+- `src/bayesian_hardle/__init__.py`
+- `src/bayesian_hardle/game.py`
+- `src/bayesian_hardle/belief.py`
+- `src/bayesian_hardle/information.py`
+- `src/bayesian_hardle/decision.py`
+- `src/bayesian_hardle/evaluation.py`
+- `tests/test_component_contracts.py`
+- `README.md`
+- `project-control/JOURNAL.md` (this append-only record)
+
+Result:
+Initialized the five focused component modules with typed Protocol contracts,
+validated immutable value objects, placeholder policy classes, and one
+integration-level scaffold test using test doubles. Documented the component
+map and seven-step information flow. No real game, Bayesian, information,
+planning, ML, RL, or MCTS behavior was added.
+
+Tests and evidence:
+- TDD RED: the new contract test failed on the missing `ArtifactSink` import.
+- TDD RED: the handoff test failed because the Protocols lacked
+  `@runtime_checkable`.
+- TDD GREEN: focused component tests — 3 passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 6 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests` — passed.
+- `git diff --check` — passed.
+- Work was isolated from the main checkout; its untracked `docs/figures/` and
+  `uv.lock` were not touched.
+
+Unresolved semantics:
+Hardle word/feedback rules, repeated-letter allocation, terminal conditions,
+prior and likelihood representation, posterior numeric update, entropy and
+information-gain formulas, planner recursion/cache semantics, policy behavior,
+benchmark protocol, and experiment acceptance gates remain unspecified or
+unimplemented. These are intentionally deferred to later reviewed issues.
+
+Evidence boundary:
+This is a local scaffold and test-double verification only. No algorithm,
+live, external, behavioral game, or supervisor acceptance is established.
