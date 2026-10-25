@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Mapping, Protocol
+from typing import Mapping, Protocol, runtime_checkable
 
 from .belief import BeliefState
 from .game import FeedbackEngine
 
 
+@runtime_checkable
 class OutcomePartitioner(Protocol):
     """Partitions a belief through the shared feedback boundary."""
 
@@ -20,6 +21,7 @@ class OutcomePartitioner(Protocol):
         ...
 
 
+@runtime_checkable
 class EntropyCalculator(Protocol):
     """Calculates entropy for a supplied outcome partition."""
 
@@ -27,6 +29,7 @@ class EntropyCalculator(Protocol):
         ...
 
 
+@runtime_checkable
 class ExpectedEntropyCalculator(Protocol):
     """Calculates expected entropy for a supplied belief and partition."""
 
@@ -38,6 +41,7 @@ class ExpectedEntropyCalculator(Protocol):
         ...
 
 
+@runtime_checkable
 class InformationGainCalculator(Protocol):
     """Calculates information gain through shared component contracts."""
 

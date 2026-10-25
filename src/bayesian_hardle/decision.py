@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Hashable, Optional, Protocol, Sequence
+from typing import Hashable, Optional, Protocol, Sequence, runtime_checkable
 
 from .belief import BeliefState
 
@@ -20,6 +20,7 @@ class DecisionState:
             raise ValueError("remaining_guesses cannot be negative")
 
 
+@runtime_checkable
 class Policy(Protocol):
     """Selects a guess from candidates supplied by the game model."""
 
@@ -64,6 +65,7 @@ class MaxInformationGainPolicy:
         raise NotImplementedError("MaxInformationGainPolicy is scaffold-only")
 
 
+@runtime_checkable
 class BayesOptimalPlanner(Protocol):
     """Plans through the shared decision state and candidate boundary."""
 
@@ -75,6 +77,7 @@ class BayesOptimalPlanner(Protocol):
         ...
 
 
+@runtime_checkable
 class PlannerCache(Protocol):
     """Stores planner results without prescribing a cache representation."""
 

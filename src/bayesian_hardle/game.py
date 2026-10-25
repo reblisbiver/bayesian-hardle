@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, runtime_checkable
 
 
+@runtime_checkable
 class VocabularyRepository(Protocol):
     """Provides the legal-guess and target vocabularies."""
 
@@ -16,6 +17,7 @@ class VocabularyRepository(Protocol):
         ...
 
 
+@runtime_checkable
 class FeedbackEngine(Protocol):
     """Defines the feedback boundary without defining feedback semantics."""
 
@@ -23,6 +25,7 @@ class FeedbackEngine(Protocol):
         ...
 
 
+@runtime_checkable
 class TerminalRules(Protocol):
     """Determines whether a game state is terminal."""
 

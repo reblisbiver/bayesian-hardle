@@ -91,6 +91,83 @@ class ComponentContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DecisionState(belief=belief, remaining_guesses=-1)
 
+    def test_scaffold_handoff_keeps_game_belief_and_evaluation_boundaries(self):
+        class FakeVocabularyRepository:
+            def legal_guesses(self):
+                return ("cigar",)
+
+            def target_vocabulary(self):
+                return ("cigar",)
+
+        class FakeFeedbackEngine:
+            def evaluate(self, guess, target):
+                return ("opaque-feedback",)
+
+        class FakePosteriorUpdater:
+            def update(self, belief, guess, feedback):
+                observation = (guess, tuple(feedback))
+                return BeliefState(
+                    candidates=belief.candidates,
+                    observations=belief.observations + (observation,),
+                )
+
+        class FakePolicy:
+            def select_guess(self, state, candidate_guesses):
+                self.seen_state = state
+                return candidate_guesses[0]
+
+        class FakeEpisodeRunner:
+            def run(self, config, policy):
+                self.seen_config = config
+                self.seen_policy = policy
+                return MetricsResult(
+                    episodes=config.benchmark.episodes,
+                    wins=1,
+                    guesses=1,
+                )
+
+        class RecordingArtifactSink:
+            def __init__(self):
+                self.artifacts = []
+
+            def write(self, name, artifact):
+                self.artifacts.append((name, artifact))
+
+        vocabulary = FakeVocabularyRepository()
+        feedback_engine = FakeFeedbackEngine()
+        updater = FakePosteriorUpdater()
+        policy = FakePolicy()
+        runner = FakeEpisodeRunner()
+        sink = RecordingArtifactSink()
+        belief = BeliefState(candidates=("cigar",))
+        state = DecisionState(belief=belief, remaining_guesses=2)
+        config = ExperimentConfig(
+            game=GameSpec(word_length=5, max_guesses=6),
+            benchmark=BenchmarkSpec(name="scaffold", episodes=1),
+        )
+
+        self.assertIsInstance(policy, Policy)
+        self.assertIsInstance(feedback_engine, FeedbackEngine)
+        self.assertIsInstance(updater, PosteriorUpdater)
+        self.assertIsInstance(runner, EpisodeRunner)
+        self.assertIsInstance(sink, ArtifactSink)
+
+        guess = policy.select_guess(state, vocabulary.legal_guesses())
+        feedback = feedback_engine.evaluate(guess, "cigar")
+        updated_belief = updater.update(belief, guess, feedback)
+        next_state = DecisionState(
+            belief=updated_belief,
+            remaining_guesses=state.remaining_guesses - 1,
+        )
+        metrics = runner.run(config, policy)
+        sink.write("metrics", metrics)
+
+        self.assertEqual(next_state.remaining_guesses, 1)
+        self.assertEqual(next_state.belief.observations, (("cigar", ("opaque-feedback",)),))
+        self.assertIs(runner.seen_config, config)
+        self.assertIs(runner.seen_policy, policy)
+        self.assertEqual(sink.artifacts, [("metrics", metrics)])
+
 
 if __name__ == "__main__":
     unittest.main()

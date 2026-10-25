@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Optional, Protocol, runtime_checkable
 
 from .decision import Policy
 from .game import GameSpec
@@ -45,6 +45,7 @@ class ExperimentConfig:
     run_id: Optional[str] = None
 
 
+@runtime_checkable
 class EpisodeRunner(Protocol):
     """Runs episodes while keeping game semantics outside evaluation."""
 
@@ -52,6 +53,7 @@ class EpisodeRunner(Protocol):
         ...
 
 
+@runtime_checkable
 class ArtifactSink(Protocol):
     """Receives evaluation artifacts at an explicit observation boundary."""
 

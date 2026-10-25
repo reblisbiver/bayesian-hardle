@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence, Tuple
+from typing import Protocol, Sequence, Tuple, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,7 @@ class BeliefState:
         object.__setattr__(self, "observations", tuple(self.observations))
 
 
+@runtime_checkable
 class PriorModel(Protocol):
     """Constructs an initial belief from the target vocabulary."""
 
@@ -25,6 +26,7 @@ class PriorModel(Protocol):
         ...
 
 
+@runtime_checkable
 class LikelihoodModel(Protocol):
     """Provides a likelihood contract without choosing a numeric model."""
 
@@ -37,6 +39,7 @@ class LikelihoodModel(Protocol):
         ...
 
 
+@runtime_checkable
 class PosteriorUpdater(Protocol):
     """Updates a belief after one observed guess and feedback value."""
 
