@@ -86,3 +86,41 @@ No supervisor audit has occurred. The research question, Bayesian
 formulation, feedback semantics, data, priors, and evaluation gates remain
 undefined. Live, device, external, and business acceptance are not in scope
 and have not been verified.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-001 complete handoff metadata
+
+Status: READY_FOR_REVIEW
+
+Branch:
+codex/issue-001-control-plane
+
+Base SHA:
+82d97d92694c178c0ed906d193a97835960c34a6
+
+Result SHA:
+88fd4c0845ea49e4949d03a5a7cc150e1909a033
+
+What changed:
+Confirmed the complete implementation checkpoint for ISSUE-001. The result
+SHA includes the project scaffold, control-plane records, ISSUE-001, and the
+test strengthened to require a READY_FOR_REVIEW handoff with the checkpoint
+SHA. This journal entry is an append-only audit record and does not change
+accepted project state.
+
+Tests:
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 3 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests` — passed.
+- `PYTHONPATH=src python3 -c 'import bayesian_hardle; assert bayesian_hardle.__version__ == "0.1.0"'` — passed.
+- `git diff --check` — passed.
+- `git status --porcelain` — clean before this append-only record.
+
+Evidence:
+The complete implementation checkpoint is
+`88fd4c0845ea49e4949d03a5a7cc150e1909a033`. The accepted-state sections in
+`PROJECT_STATE.md` remain empty, and no live or external acceptance is being
+claimed.
+
+Remaining unknowns:
+Supervisor must independently review ISSUE-001 before any next research
+stage. The research question, Bayesian formulation, feedback semantics, data,
+priors, and evaluation gates remain undefined.
