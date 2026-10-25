@@ -277,3 +277,60 @@ Required correction scope:
 - No Hardle feedback semantics, posterior numeric update, entropy/IG arithmetic, Bellman recursion, policy algorithms, ML/RL/MCTS.
 - Use TDD for each correction and rerun the complete verification suite.
 - Append a new `[EXECUTION REPORT]` for the corrected checkpoint. Do not rewrite the previous executor report.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-003 interface corrections
+
+Status: READY_FOR_REVIEW (awaiting supervisor review; no supervisor
+acceptance is claimed)
+
+Branch:
+codex/issue-003-component-scaffold
+
+Base SHA:
+257129f (supervisor changes-required review checkpoint)
+
+Result SHA:
+d81c42d (verified implementation checkpoint immediately before this
+append-only report)
+
+What changed:
+- `src/bayesian_hardle/belief.py`: `BeliefState` now carries an immutable
+  tuple-based `probability_mass` representation for posterior mass `b(w)`;
+  no normalization or posterior update is implemented.
+- `src/bayesian_hardle/information.py` and `__init__.py`: added immutable
+  `OutcomeBranch` and `OutcomeDistribution` boundaries carrying an opaque
+  outcome, `P(o | g,b)`, and posterior `b^{g,o}`; changed entropy to receive
+  `BeliefState`, and expected-entropy/IG contracts to receive the typed
+  distribution boundary.
+- `src/bayesian_hardle/decision.py`: `BayesOptimalPlanner.select_guess`
+  now explicitly requires the shared `FeedbackEngine` and `PosteriorUpdater`
+  contracts.
+- `tests/test_component_contracts.py`: added one regression test per
+  supervisor correction, including RED-to-GREEN interface checks.
+
+Tests and evidence:
+- TDD RED 1: probability-mass test failed because `BeliefState` lacked the
+  `probability_mass` constructor field; GREEN passed.
+- TDD RED 2: outcome-distribution test failed because `OutcomeBranch` and
+  `OutcomeDistribution` were not importable; GREEN passed.
+- TDD RED 3: planner-signature test failed because the planner accepted only
+  `state` and `candidate_guesses`; GREEN passed after adding both shared
+  semantics dependencies.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 9 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests` — passed.
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -c 'import bayesian_hardle; assert bayesian_hardle.__version__ == "0.1.0"; from bayesian_hardle import OutcomeBranch, OutcomeDistribution; print("import-check: ok")'` — passed.
+- `git diff --check` — passed before the implementation checkpoint.
+
+Scope boundary:
+The five top-level architecture groups are preserved. No Hardle semantics,
+numeric posterior update, normalization, entropy/IG arithmetic, Bellman
+recursion, policy algorithm, ML, RL, or MCTS was added. Evidence is limited
+to local interface tests and static checks; no live, external, behavioral
+game, or supervisor acceptance is established.
+
+Remaining unknowns:
+Hardle word/feedback rules, repeated-letter allocation, terminal conditions,
+posterior update and normalization algorithms, entropy and information-gain
+formulas, planner recursion/cache semantics, policy behavior, benchmark
+protocol, and experiment acceptance gates remain unspecified or
+unimplemented for later reviewed issues.
