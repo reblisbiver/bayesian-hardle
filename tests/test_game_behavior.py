@@ -1,5 +1,6 @@
 import sys
 import unittest
+import json
 from pathlib import Path
 
 
@@ -62,6 +63,17 @@ class GameBehaviorTests(unittest.TestCase):
         self.assertEqual(len(repository.target_vocabulary()), 2315)
         self.assertEqual(set(("covid", "padel")) - set(repository.legal_guesses()), set())
         self.assertEqual(set(("covid", "padel")) & set(repository.target_vocabulary()), set())
+
+    def test_wordlist_provenance_is_pinned_to_immutable_revisions(self):
+        provenance = json.loads(
+            (PROJECT_ROOT / "data/wordlists/provenance.json").read_text(encoding="utf-8")
+        )
+        legal = provenance["legal_guess_source"]
+        answers = provenance["candidate_answer_source"]
+        self.assertIn("/b03237c95a2b909226ef4d9ed195d41acf40490f/", legal["url"])
+        self.assertIn("/50838083dca5359b3cacf1ab677059b40c0e025e/", answers["url"])
+        self.assertEqual(legal["sha256"], "1ce9c80539231949cbb09ebfbcf32be05b9c1c04dac1cc6a752e032c4fcf5f40")
+        self.assertEqual(answers["sha256"], "5209b35f823f8b80f0404f863bd80df06d6a966c6eb1016d69f38badc6eed5d0")
 
 
 if __name__ == "__main__":

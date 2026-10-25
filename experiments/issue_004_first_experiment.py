@@ -19,6 +19,7 @@ from bayesian_hardle import (
     ExactBayesOptimalPlanner,
     ExactEpisodeRunner,
     ExactPosteriorUpdater,
+    ExactOutcomePartitioner,
     ExperimentConfig,
     GameSpec,
     HardleFeedbackEngine,
@@ -72,6 +73,7 @@ def main() -> None:
     updater = ExactPosteriorUpdater(feedback)
     prior = UniformPrior()
     terminal = HardleTerminalRules()
+    shared_partitioner = ExactOutcomePartitioner(updater)
     full_runner = ExactEpisodeRunner(
         vocabulary, feedback, prior, updater, terminal
     )
@@ -105,7 +107,9 @@ def main() -> None:
         )
     )
     full_max_ig = MaxInformationGainPolicy(
-        feedback, time_limit_seconds=max_ig_limit
+        feedback,
+        partitioner=shared_partitioner,
+        time_limit_seconds=max_ig_limit,
     )
     full_results.append(
         _run_policy(
@@ -156,7 +160,7 @@ def main() -> None:
             small_runner,
             small_config,
             "Max-IG",
-            MaxInformationGainPolicy(feedback),
+            MaxInformationGainPolicy(feedback, partitioner=shared_partitioner),
             "small declared vocabulary",
         )
     )
