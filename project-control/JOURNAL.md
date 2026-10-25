@@ -497,3 +497,35 @@ review. Full exact Bayes-optimal planning is intentionally limited to the
 declared small vocabulary, and full Max-IG remains incomplete at the measured
 budget. No scheduled-answer membership was vendored or supplied to the
 solver.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-004 exact Bayesian core and first experiment — changes required
+
+Status: CHANGES_REQUIRED
+
+Independent supervisor review did not accept the executor experiment as a valid ISSUE-004 result, despite the full automated suite passing.
+
+Accepted implementation evidence:
+- Hardle feedback uses exact-position plus duplicate-aware residual multiplicity matching.
+- Uniform prior and deterministic posterior filtering/renormalization are consistent with the settled Bayesian contract.
+- Outcome partitions, Shannon entropy, expected posterior entropy, and information gain satisfy the required identities in the reviewed tests.
+- Solver candidate-answer vocabulary remains separate from legal guesses, and the leaked Hardle scheduled-answer membership is not solver knowledge.
+- Exact finite-horizon planner reuses the shared FeedbackEngine and PosteriorUpdater boundaries.
+
+Blocking findings:
+1. Max-IG tie handling is behaviorally incorrect for the baseline experiment. Once the posterior collapses to a single answer, all legal guesses have IG = 0, and the current implementation chooses an arbitrary tied legal guess rather than the known answer. Independent traces reproduce this on all five small-scope targets: after one informative guess the posterior becomes singleton, yet Max-IG repeatedly guesses `adieu` and finishes 0/5. This makes the reported small-scope Max-IG result invalid as a meaningful baseline comparison. Required correction: remain a pure maximum-information-gain policy, but define a solve-aware tie-break among equal-IG actions so a known answer is guessed rather than an arbitrary non-answer.
+2. Exact Bayes-optimal action selection optimizes final solve probability only and leaves equal-value actions ordered arbitrarily. Under the settled evaluation contract, solve probability is primary and mean guesses is secondary. Independent traces show the planner deliberately spends an extra guess after the answer is already uniquely identified, then solves on the final allowed move. Its reported 5/5 solve rate is compatible with the primary Bellman objective, but the 3.0 mean-guesses result is an artifact of unresolved tie-breaking rather than a meaningful secondary metric. Required correction: preserve final solve probability as the primary value; among actions with equal final solve probability, prefer the action/policy with lower expected guesses to solution (or an equivalent lexicographic secondary criterion).
+
+Scaling observation, not a correctness blocker:
+- Full Max-IG did use the full 12,974-guess / 2,315-answer scope, but the current exact implementation exhausted the declared 30-second budget before completing even the first episode. This is valid evidence of a naive-scaling limit, not a completed baseline result. It must remain labeled incomplete until a computationally practical exact implementation is available or the experimental scope is explicitly revised by the owner.
+
+Fresh supervisor verification evidence:
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m unittest discover -s tests -v` — 30/30 tests passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-pycache python3 -m compileall -q src tests experiments scripts` — passed.
+- `git diff --check e9fd532..953db2e` — passed.
+- Independent small-scope policy traces reproduced Max-IG singleton-belief misbehavior for all five targets and Bayes-optimal extra-step behavior after answer identification.
+
+Acceptance boundary:
+- ISSUE-004 is not accepted in its current form.
+- The Bayesian inference/information core is not being rejected; required changes are confined to policy tie resolution and regeneration of affected experiment artifacts/tests.
+- `PROJECT_STATE.md` remains unchanged.
+- No follow-up executor task is dispatched by this review.
