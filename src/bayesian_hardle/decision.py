@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import math
 import random
 import time
-from typing import Dict, Hashable, Optional, Protocol, Sequence, Tuple, runtime_checkable
+from typing import Any, Dict, Hashable, Optional, Protocol, Sequence, Tuple, runtime_checkable
 
 from .belief import BeliefState, PosteriorUpdater
 from .accelerated import ExactFeedbackCodeMatrix, MatrixInformationGainCalculator
@@ -328,6 +329,7 @@ class ExactBayesOptimalPlanner:
         "branch_and_bound",
         "horizon_two_closed_form",
         "horizon_two_batch",
+        "root_horizon_two_ordering",
     )
 
     _STAT_KEYS = (
@@ -352,6 +354,9 @@ class ExactBayesOptimalPlanner:
         "action_sort_calls",
         "branch_grouping_calls",
         "branch_sort_calls",
+        "root_order_proxy_calls",
+        "root_order_proxy_actions",
+        "root_order_proxy_matrix_cells",
     )
 
     def __init__(
@@ -359,6 +364,8 @@ class ExactBayesOptimalPlanner:
         cache: Optional[PlannerCache] = None,
         feedback_matrix: Optional[ExactFeedbackCodeMatrix] = None,
         optimization_layers: Optional[Sequence[str]] = None,
+        root_audit: bool = False,
+        root_audit_limit: Optional[int] = None,
     ) -> None:
         self.cache = cache if cache is not None else InMemoryPlannerCache()
         self.cache_hits = 0
@@ -383,6 +390,70 @@ class ExactBayesOptimalPlanner:
         self._branch_count_histogram: Dict[str, int] = {}
         self._branch_size_histogram: Dict[str, int] = {}
         self._state_support_histogram: Dict[str, int] = {}
+        if root_audit_limit is not None and root_audit_limit <= 0:
+            raise ValueError("root_audit_limit must be positive when supplied")
+        self.root_audit = root_audit
+        self.root_audit_limit = root_audit_limit
+        self._root_actions_seen = 0
+        self._root_action_records: list[Dict[str, Any]] = []
+        self._root_audit_truncated = False
+        self._active_root_action: Optional[Dict[str, Any]] = None
+        self._root_child_state_key_counts: Dict[Hashable, int] = {}
+        self._root_timing_seconds: Dict[str, float] = {
+            "root_partition": 0.0,
+            "child_h2_solve": 0.0,
+            "cache_key": 0.0,
+            "pruning": 0.0,
+            "root_order_proxy": 0.0,
+        }
+        self._root_first_incumbent_seconds: Optional[float] = None
+        self._root_final_incumbent_seconds: Optional[float] = None
+
+    @staticmethod
+    def _key_digest(key: Hashable) -> str:
+        return hashlib.sha256(repr(key).encode("utf-8")).hexdigest()[:16]
+
+    def _add_root_timing(self, bucket: str, elapsed: float) -> None:
+        if self._active_root_action is None:
+            return
+        self._active_root_action["timing_seconds"][bucket] += elapsed
+        self._root_timing_seconds[bucket] += elapsed
+
+    def _new_root_action_record(self, guess: str) -> Optional[Dict[str, Any]]:
+        if not self.root_audit:
+            return None
+        if (
+            self.root_audit_limit is not None
+            and len(self._root_action_records) >= self.root_audit_limit
+        ):
+            self._root_audit_truncated = True
+            return None
+        return {
+            "guess": guess,
+            "status": "evaluating",
+            "value": None,
+            "branch_count": 0,
+            "branches": [],
+            "child_state_solve_requests": 0,
+            "distinct_child_state_keys": 0,
+            "repeated_child_state_hits": 0,
+            "child_cache_hits": 0,
+            "horizon_two_batch_calls": 0,
+            "horizon_two_batch_actions": 0,
+            "horizon_two_batch_matrix_cells": 0,
+            "timing_seconds": {
+                "root_partition": 0.0,
+                "child_h2_solve": 0.0,
+                "cache_key": 0.0,
+                "pruning": 0.0,
+                "total": 0.0,
+            },
+            "pruned": False,
+            "prune_after_branch_index": None,
+            "prune_upper_success": None,
+            "prune_lower_expected": None,
+            "incumbent_after": None,
+        }
 
     def _enabled(self, layer: str) -> bool:
         return layer in self.optimization_layers
@@ -396,6 +467,7 @@ class ExactBayesOptimalPlanner:
     def instrumentation(self) -> Dict[str, object]:
         """Return a stable snapshot of planner counters for benchmark artifacts."""
 
+        root_requests = sum(self._root_child_state_key_counts.values())
         return {
             **self.stats,
             "cache_hits": self.cache_hits,
@@ -408,6 +480,20 @@ class ExactBayesOptimalPlanner:
             "branch_count_histogram": dict(sorted(self._branch_count_histogram.items(), key=lambda item: int(item[0]))),
             "branch_size_histogram": dict(sorted(self._branch_size_histogram.items(), key=lambda item: int(item[0]))),
             "state_support_histogram": dict(sorted(self._state_support_histogram.items(), key=lambda item: int(item[0]))),
+            "root_audit_enabled": self.root_audit,
+            "root_audit_limit": self.root_audit_limit,
+            "root_audit_truncated": self._root_audit_truncated,
+            "root_actions_seen": self._root_actions_seen,
+            "root_actions_traced": len(self._root_action_records),
+            "root_child_state_requests": root_requests,
+            "root_distinct_child_state_keys": len(self._root_child_state_key_counts),
+            "root_repeated_child_state_hits": max(
+                0, root_requests - len(self._root_child_state_key_counts)
+            ),
+            "root_timing_seconds": dict(self._root_timing_seconds),
+            "root_first_incumbent_seconds": self._root_first_incumbent_seconds,
+            "root_final_incumbent_seconds": self._root_final_incumbent_seconds,
+            "root_action_records": list(self._root_action_records),
         }
 
     @classmethod
@@ -477,15 +563,25 @@ class ExactBayesOptimalPlanner:
         feedback_engine: FeedbackEngine,
         posterior_updater: PosteriorUpdater,
     ) -> str:
+        is_root = state.remaining_guesses == 3
+        key_started = time.perf_counter()
         key = self._canonical_key(
             state,
             candidate_guesses,
             canonicalize=self._enabled("canonical_memoization"),
         )
         cached = self.cache.get(key)
+        if self._active_root_action is not None:
+            self._add_root_timing(
+                "cache_key", time.perf_counter() - key_started
+            )
         if cached is not None:
             self.cache_hits += 1
             return cached
+        if is_root:
+            self._root_actions_seen = 0
+            self._root_first_incumbent_seconds = None
+            self._root_final_incumbent_seconds = None
         self.cache_misses += 1
         self.stats["states_evaluated"] += 1
         support_size = len(state.belief.candidates)
@@ -512,7 +608,11 @@ class ExactBayesOptimalPlanner:
             self.cache.put(key, selected)
             return selected
 
-        ordered = self._ordered_actions(state, candidate_guesses)
+        ordered = self._ordered_actions(
+            state,
+            candidate_guesses,
+            feedback_engine=feedback_engine,
+        )
         tie_rank = {
             guess: index
             for index, guess in enumerate(
@@ -523,18 +623,51 @@ class ExactBayesOptimalPlanner:
         }
         incumbent: Optional[PlannerValue] = None
         incumbent_guess: Optional[str] = None
+        root_started = time.perf_counter() if is_root else None
         for guess in ordered:
-            self.stats["actions_evaluated"] += 1
-            value = self._guess_value(
-                state,
-                guess,
-                candidate_guesses,
-                feedback_engine,
-                posterior_updater,
-                incumbent=incumbent,
+            if is_root:
+                self._root_actions_seen += 1
+            record = (
+                self._new_root_action_record(guess)
+                if is_root
+                else None
             )
+            action_started = time.perf_counter() if record is not None else None
+            batch_snapshot = {
+                key: self.stats[key]
+                for key in (
+                    "horizon_two_batch_calls",
+                    "horizon_two_batch_actions",
+                    "horizon_two_batch_matrix_cells",
+                )
+            }
+            previous_root_action = self._active_root_action
+            self._active_root_action = record
+            self.stats["actions_evaluated"] += 1
+            try:
+                value = self._guess_value(
+                    state,
+                    guess,
+                    candidate_guesses,
+                    feedback_engine,
+                    posterior_updater,
+                    incumbent=incumbent,
+                )
+            finally:
+                self._active_root_action = previous_root_action
+            if record is not None:
+                assert action_started is not None
+                record["timing_seconds"]["total"] = (
+                    time.perf_counter() - action_started
+                )
+                for key, before in batch_snapshot.items():
+                    record[key] = self.stats[key] - before
             if value is None:
                 self.stats["actions_pruned"] += 1
+                if record is not None:
+                    record["status"] = "pruned"
+                    record["pruned"] = True
+                    self._root_action_records.append(record)
                 continue
             self.stats["actions_completed"] += 1
             if incumbent is None or self._value_is_better(
@@ -546,6 +679,19 @@ class ExactBayesOptimalPlanner:
             ):
                 incumbent = value
                 incumbent_guess = guess
+                if record is not None:
+                    record["incumbent_after"] = list(value)
+                if is_root and root_started is not None:
+                    elapsed = time.perf_counter() - root_started
+                    if self._root_first_incumbent_seconds is None:
+                        self._root_first_incumbent_seconds = elapsed
+                    self._root_final_incumbent_seconds = elapsed
+            if record is not None:
+                record["status"] = "completed"
+                record["value"] = list(value)
+                self._root_action_records.append(record)
+            elif is_root and self.root_audit:
+                self._root_audit_truncated = True
         if incumbent_guess is None:
             raise RuntimeError("exact planner evaluated no complete action")
         self.cache.put(key, incumbent_guess)
@@ -560,6 +706,7 @@ class ExactBayesOptimalPlanner:
         posterior_updater: PosteriorUpdater,
         incumbent: Optional[PlannerValue] = None,
     ) -> Optional[PlannerValue]:
+        key_started = time.perf_counter()
         key = (
             "value",
             self._canonical_key(
@@ -569,7 +716,12 @@ class ExactBayesOptimalPlanner:
             ),
             guess,
         )
-        if key in self._value_cache:
+        cached = key in self._value_cache
+        if self._active_root_action is not None:
+            self._add_root_timing(
+                "cache_key", time.perf_counter() - key_started
+            )
+        if cached:
             self.stats["value_cache_hits"] += 1
             return self._value_cache[key]
         self.stats["value_cache_misses"] += 1
@@ -600,6 +752,7 @@ class ExactBayesOptimalPlanner:
             feedback_engine,
             mass_table=mass_table,
         )
+        partition_started = time.perf_counter()
         branches = self._transition_branches(
             state,
             guess,
@@ -607,11 +760,31 @@ class ExactBayesOptimalPlanner:
             feedback_engine,
             use_matrix=use_matrix,
         )
+        if self._active_root_action is not None:
+            self._add_root_timing(
+                "root_partition", time.perf_counter() - partition_started
+            )
+            self._active_root_action["branch_count"] = len(branches)
+            self._active_root_action["branches"] = [
+                {
+                    "index": index,
+                    "feedback": list(outcome),
+                    "posterior_mass": probability,
+                    "support_size": len(members),
+                    "is_win": outcome == (len(guess), 0),
+                    "processed": False,
+                    "child_state_key": None,
+                    "child_cache_hit": False,
+                }
+                for index, (outcome, probability, members) in enumerate(branches)
+            ]
         success_probability = 0.0
         expected_guesses = 1.0
         processed_probability = 0.0
-        for outcome, probability, members in branches:
+        for branch_index, (outcome, probability, members) in enumerate(branches):
             self.stats["branches_evaluated"] += 1
+            if self._active_root_action is not None:
+                self._active_root_action["branches"][branch_index]["processed"] = True
             if outcome == (len(guess), 0):
                 success_probability += probability
             elif state.remaining_guesses > 1:
@@ -627,6 +800,30 @@ class ExactBayesOptimalPlanner:
                     belief=posterior,
                     remaining_guesses=state.remaining_guesses - 1,
                 )
+                child_key_started = time.perf_counter()
+                child_key = self._canonical_key(
+                    next_state,
+                    candidate_guesses,
+                    canonicalize=self._enabled("canonical_memoization"),
+                )
+                if self._active_root_action is not None:
+                    self._add_root_timing(
+                        "cache_key", time.perf_counter() - child_key_started
+                    )
+                    record = self._active_root_action
+                    record["child_state_solve_requests"] += 1
+                    prior_requests = self._root_child_state_key_counts.get(
+                        child_key, 0
+                    )
+                    self._root_child_state_key_counts[child_key] = prior_requests + 1
+                    if prior_requests == 0:
+                        record["distinct_child_state_keys"] += 1
+                    else:
+                        record["repeated_child_state_hits"] += 1
+                    branch_record = record["branches"][branch_index]
+                    branch_record["child_state_key"] = self._key_digest(child_key)
+                child_cache_hits_before = self.cache_hits
+                child_started = time.perf_counter()
                 next_guess = self._best_guess(
                     next_state,
                     candidate_guesses,
@@ -640,6 +837,17 @@ class ExactBayesOptimalPlanner:
                     feedback_engine,
                     posterior_updater,
                 )
+                if self._active_root_action is not None:
+                    self._add_root_timing(
+                        "child_h2_solve", time.perf_counter() - child_started
+                    )
+                    record = self._active_root_action
+                    child_cache_hit = self.cache_hits > child_cache_hits_before
+                    if child_cache_hit:
+                        record["child_cache_hits"] += 1
+                    record["branches"][branch_index]["child_cache_hit"] = (
+                        child_cache_hit
+                    )
                 if next_success is None or next_expected is None:
                     raise RuntimeError("best child action was unexpectedly pruned")
                 success_probability += probability * next_success
@@ -649,9 +857,20 @@ class ExactBayesOptimalPlanner:
                 upper_success = success_probability + max(
                     0.0, 1.0 - processed_probability
                 )
-                if self._cannot_beat_incumbent(
+                prune_started = time.perf_counter()
+                cannot_beat = self._cannot_beat_incumbent(
                     upper_success, expected_guesses, incumbent
-                ):
+                )
+                if self._active_root_action is not None:
+                    self._add_root_timing(
+                        "pruning", time.perf_counter() - prune_started
+                    )
+                if cannot_beat:
+                    if self._active_root_action is not None:
+                        self._active_root_action["pruned"] = True
+                        self._active_root_action["prune_after_branch_index"] = branch_index
+                        self._active_root_action["prune_upper_success"] = upper_success
+                        self._active_root_action["prune_lower_expected"] = expected_guesses
                     return None
         value = (success_probability, expected_guesses)
         self._value_cache[key] = value
@@ -883,6 +1102,7 @@ class ExactBayesOptimalPlanner:
         self,
         state: DecisionState,
         candidate_guesses: Sequence[str],
+        feedback_engine: Optional[FeedbackEngine] = None,
     ) -> Tuple[str, ...]:
         legal = tuple(candidate_guesses)
         if not self._enabled("action_ordering"):
@@ -894,7 +1114,77 @@ class ExactBayesOptimalPlanner:
             key=lambda guess: (-mass[guess], guess),
         )
         probes = sorted(guess for guess in legal if guess not in mass)
+        if (
+            state.remaining_guesses == 3
+            and feedback_engine is not None
+            and self._enabled("root_horizon_two_ordering")
+        ):
+            proxy_scores = self._root_horizon_two_proxy(
+                state,
+                legal,
+                feedback_engine,
+            )
+            if proxy_scores is not None:
+                candidates = sorted(
+                    candidates,
+                    key=lambda guess: (
+                        -proxy_scores[guess][0],
+                        proxy_scores[guess][1],
+                        -mass[guess],
+                        guess,
+                    ),
+                )
+                probes = sorted(
+                    probes,
+                    key=lambda guess: (
+                        -proxy_scores[guess][0],
+                        proxy_scores[guess][1],
+                        guess,
+                    ),
+                )
         return tuple(candidates + probes)
+
+    def _root_horizon_two_proxy(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+    ) -> Optional[Dict[str, PlannerValue]]:
+        """Return exact h=2 values used only to order h=3 root actions.
+
+        The proxy is deliberately not a bound and never removes an action.
+        It uses one exact matrix batch over the current root support, so the
+        ordering layer can be measured independently from recursive h=3 work.
+        """
+
+        if (
+            self.feedback_matrix is None
+            or not self._enabled("horizon_two_batch")
+            or type(feedback_engine) is not HardleFeedbackEngine
+            or feedback_engine.game_spec.word_length
+            != self.feedback_matrix.word_length
+        ):
+            return None
+        legal = tuple(candidate_guesses)
+        if not all(guess in self.feedback_matrix._guess_indices for guess in legal):
+            return None
+        mass_table = self._mass_table(state.belief)
+        answer_words = tuple(word for word, _ in mass_table)
+        if not self.feedback_matrix.contains_answers(answer_words):
+            return None
+        started = time.perf_counter()
+        values = self.feedback_matrix.horizon_two_values(
+            legal,
+            answer_words,
+            tuple(mass for _, mass in mass_table),
+            legal,
+        )
+        elapsed = time.perf_counter() - started
+        self.stats["root_order_proxy_calls"] += 1
+        self.stats["root_order_proxy_actions"] += len(legal)
+        self.stats["root_order_proxy_matrix_cells"] += len(legal) * len(answer_words)
+        self._root_timing_seconds["root_order_proxy"] += elapsed
+        return dict(zip(legal, values))
 
     def _can_use_matrix(
         self,

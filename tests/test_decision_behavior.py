@@ -516,6 +516,97 @@ class DecisionBehaviorTests(unittest.TestCase):
         self.assertGreater(instrumentation["action_sort_calls"], 0)
         self.assertGreater(instrumentation["branch_grouping_calls"], 0)
 
+    def test_horizon_three_root_audit_records_exact_branch_and_child_structure(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        reference = ExactBayesOptimalReferencePlanner()
+        audited = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            root_audit=True,
+        )
+        state = DecisionState(UniformPrior().initial_belief(support), 3)
+
+        reference_guess = reference.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        audited_guess = audited.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+
+        self.assertEqual(audited_guess, reference_guess)
+        instrumentation = audited.instrumentation()
+        self.assertEqual(instrumentation["root_actions_seen"], len(legal))
+        self.assertEqual(instrumentation["root_actions_traced"], len(legal))
+        self.assertGreater(instrumentation["root_child_state_requests"], 0)
+        self.assertGreater(instrumentation["root_distinct_child_state_keys"], 0)
+        self.assertEqual(
+            instrumentation["root_child_state_requests"],
+            instrumentation["root_distinct_child_state_keys"]
+            + instrumentation["root_repeated_child_state_hits"],
+        )
+        records = instrumentation["root_action_records"]
+        self.assertEqual(len(records), len(legal))
+        self.assertTrue(all(record["branch_count"] >= 1 for record in records))
+        self.assertTrue(
+            all(
+                len(record["branches"]) == record["branch_count"]
+                for record in records
+            )
+        )
+        self.assertTrue(
+            all(
+                sum(branch["posterior_mass"] for branch in record["branches"])
+                <= 1.0 + 1e-12
+                for record in records
+            )
+        )
+        self.assertGreater(instrumentation["root_timing_seconds"]["child_h2_solve"], 0.0)
+
+    def test_horizon_two_proxy_ordering_is_exact_safe_and_does_not_remove_actions(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        state = DecisionState(UniformPrior().initial_belief(support), 3)
+        reference = ExactBayesOptimalReferencePlanner()
+        proxy = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            root_audit=True,
+        )
+
+        reference_guess = reference.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        proxy_guess = proxy.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        self.assertEqual(proxy_guess, reference_guess)
+        self.assertEqual(proxy.instrumentation()["root_order_proxy_actions"], len(legal))
+        self.assertGreater(proxy.instrumentation()["root_order_proxy_calls"], 0)
+        self.assertEqual(proxy.instrumentation()["root_actions_seen"], len(legal))
+
 
 if __name__ == "__main__":
     unittest.main()
