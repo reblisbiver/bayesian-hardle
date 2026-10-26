@@ -11,8 +11,7 @@ required; `project-control/PROJECT_STATE.md` is unchanged.
 - Worktree: `/private/tmp/bayesian-hardle-issue-012`
 - Base: `36561c1d0d9bfc9d000de3bdd82c13939eb1c9ad`
   (`codex/issue-011-exact-planner-hotspots`)
-- Result checkpoint before this handoff: to be filled after the implementation
-  and artifact commits
+- Result checkpoint before this handoff: `7441902`
 - `PROJECT_STATE.md` SHA-256 remains
   `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`
 - Canonical checkout was not modified.

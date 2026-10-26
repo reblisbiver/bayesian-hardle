@@ -961,3 +961,78 @@ Known boundaries:
   supervisor acceptance is claimed.
 - `project-control/PROJECT_STATE.md` was not modified. Its SHA-256 remained
   `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-012 horizon-3 root decomposition,
+reuse audit, and exact pruning
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not
+claimed)
+
+Issue: `ISSUE-012`
+Branch: `codex/issue-012-horizon3-root-audit`
+Worktree: `/private/tmp/bayesian-hardle-issue-012`
+Base SHA: `36561c1d0d9bfc9d000de3bdd82c13939eb1c9ad`
+(`codex/issue-011-exact-planner-hotspots`)
+Result checkpoint before this handoff: `7441902`
+
+What changed:
+- Added opt-in horizon-3 root auditing in `ExactBayesOptimalPlanner`. Completed
+  root runs record every first action, all feedback branches, branch posterior
+  mass/support, child-state key digests, exact cache hits, h=2 batch work,
+  timing buckets, incumbent timing, and exact prune location.
+- Added `root_horizon_two_ordering`, an exact h=2 matrix proxy used only to
+  order candidates before probes. It never removes actions or changes the
+  exact objective, bound, or tie rule.
+- Added reference-equivalence regression tests and a standalone bounded
+  ladder/full-support benchmark with JSON, Markdown, and cProfile artifacts.
+
+Main diagnosis:
+- The completed h=3 ladder reached support `500` × legal `508`. On the
+  pre-ISSUE-012 ordering control, mean Hardle branches/action increased from
+  `8.32` at support 32 to `12.80` at support 500, while mean child
+  support/branch increased from `3.84` to `39.06`.
+- At support 500, exact child h=2 batch work was `116,515,388` matrix cells
+  and about `4.77s` aggregate timing; root partitioning was about `0.054s`,
+  cache/key handling `0.195s`, and pruning checks `0.001s`. This identifies
+  repeated h=2 work as the dominant term.
+- Child-state reuse was low at scale: `2,811` requests, `2,792` distinct
+  canonical keys, `0.7%` repeated requests. The existing exact memoization was
+  retained; no speculative second cache was added.
+- The exact proxy reduced h=2 cells on all five paired rows. At support 500
+  it reduced cells to `116,431,060` and raised root pruning from `98.4%` to
+  `99.0%`. Paired selected guesses and values were equal within `1e-12`.
+- No stronger certified root bound or full root-partition batch was added:
+  profiling showed the h=2 child work dominated, and no cheaper exact bound
+  with measured net benefit was established.
+
+Evidence:
+- `experiments/results/issue_012_horizon3_root_audit.json`
+- `experiments/results/issue_012_horizon3_root_audit_summary.md`
+- `experiments/results/issue_012_profiles/`
+- `project-control/issues/ISSUE-012-horizon3-root-audit.md`
+
+Scaling boundary:
+- Largest completed exact h=3 row: support `500` × legal `508`, matrix
+  memory `254,000` bytes.
+- Curated `2,315` support × `12,974` legal h=3 probes used a declared `45s`
+  budget in both ordering variants and timed out. No full 2,315/horizon-3
+  feasibility claim is made. The matrix dimension is `30,034,810` uint8
+  cells, but h=3 root completion was not observed.
+
+Fresh verification:
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue012-final-pycache python3 -m unittest discover -s tests -v` — `87` passed, `9` skipped.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue012-final-pycache python3 -m compileall -q src tests experiments` — passed.
+- Package import/version check — passed.
+- JSON artifact validator — passed: `12` runs, `10` completed paired ladder
+  rows, `2` explicit full-support timeouts; every completed root trace covers
+  all legal first actions and satisfies requests = distinct + repeated.
+- `git diff --check` — passed.
+- `project-control/PROJECT_STATE.md` was not modified. Its SHA-256 remained
+  `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+Known boundaries:
+- Timings are local machine evidence; no remote, device, live, business, or
+  supervisor acceptance is claimed.
+- The final handoff commit adds this append-only record; `PROJECT_STATE.md`
+  remains unchanged and requires independent `[SUPERVISOR REVIEW]` before any
+  accepted-state advancement.
