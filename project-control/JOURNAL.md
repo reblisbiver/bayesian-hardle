@@ -1036,3 +1036,54 @@ Known boundaries:
 - The final handoff commit adds this append-only record; `PROJECT_STATE.md`
   remains unchanged and requires independent `[SUPERVISOR REVIEW]` before any
   accepted-state advancement.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-013 horizon-2 child bounds and exact batch fusion
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-013`
+Branch: `codex/issue-013-horizon2-bounds-batch`
+Worktree: `/private/tmp/bayesian-hardle-issue-013`
+Base SHA: `34d4e58fdf940c40ca8a6a1f134e8a1125c573ae`
+Implementation checkpoint before this handoff: `aa59c10`
+
+What changed:
+- Proved and tested a finite-36-code H2 capacity upper bound. It is exact-safe
+  but too loose on the support=500 replay: strict child-action skips=0 and
+  strict root-action skips=0. The bound is analysis-only and avoided work=0.
+- Added an exact ragged H2 child block evaluator and explicit opt-in planner
+  layer. Scalar/reference values and deterministic selections match within
+  `1e-12`; default planner use is disabled after net-negative measurement.
+- Added child H2 exact-solve, block, logical-cell, temporary-memory, and
+  bound-only-skip instrumentation plus a fresh ladder/full-probe driver.
+
+Fresh measurement:
+- Completed exact h=3 ladder supports: `32, 50, 100, 200, 500, 750, 1000`
+  with legal counts `support+8`; all 7 control/fused pairs were equivalent.
+- At support=500: control select `6.007s`, `116,431,060` H2 cells;
+  fused select `7.163s`, `119,111,268` H2 cells, peak temporary `256,484`
+  bytes. The delayed branch-and-bound flush makes fusion slower.
+- Largest completed exact row: support `1000` × legal `1008` × h=3.
+- Curated `2315 × 12974 × h=3`: both control and fused probes timed out at
+  the declared `45s` budget. No feasibility claim is made.
+
+Evidence:
+- `docs/superpowers/specs/2026-10-26-issue-013-horizon2-bounds-batch-design.md`
+- `docs/superpowers/plans/2026-10-26-issue-013-horizon2-bounds-batch.md`
+- `experiments/results/issue_013_horizon2_bounds_batch.json`
+- `experiments/results/issue_013_horizon2_bounds_batch_summary.md`
+- `experiments/results/issue_013_profiles/`
+- `project-control/issues/ISSUE-013-horizon2-bounds-batch.md`
+
+Verification observed before final handoff rerun:
+- Full suite `92` passed, `9` skipped.
+- `compileall`, artifact validation, paired exact-equivalence validation,
+  and `git diff --check` passed.
+- `PROJECT_STATE.md` SHA-256 remains
+  `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+Known boundaries:
+- Timings are local execution evidence; no remote, device, live, business, or
+  supervisor acceptance is claimed.
+- `PROJECT_STATE.md` remains unchanged and requires independent
+  `[SUPERVISOR REVIEW]` before any accepted-state advancement.
