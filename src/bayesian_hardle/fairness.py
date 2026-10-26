@@ -178,4 +178,3 @@ def resolve_hypothesis_mode(
     raise ValueError(
         "unknown hypothesis mode; choose full-uniform, full-frequency, or curated-2315"
     )
-

@@ -42,4 +42,3 @@ TURN 2 | mode=full-uniform (PRIMARY STRICT FAIRNESS) | policy=map
 Enter Hardle feedback (exact misplaced), or q: q
 status=QUIT
 ```
-
