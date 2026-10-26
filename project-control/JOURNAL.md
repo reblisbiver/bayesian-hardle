@@ -736,3 +736,61 @@ Evidence paths:
 Known boundary:
 - The package declares `wordfreq==3.1.1`; OWNER setup should run `python3 -m pip install .` before using `full-frequency`. The old system pip in this Mac rejected editable PEP 517 installation, so evidence used the standard wheel install in a dedicated temporary venv. This is an installation-tool limitation, not a solver fallback.
 - Full-support exact Bayes-optimal planning remains out of scope. No scheduled Hardle answer list is supplied to fair-mode inference. Executor evidence remains pending independent SUPERVISOR review.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-007 interactive browser GUI for acceptance
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-007`
+Branch: `codex/issue-007-interactive-gui`
+Base SHA: `41873fb024f1731b791aafc0f3c8d7ee277f1610` (ISSUE-006 executor branch)
+Implementation commits:
+- `f924750` — design and implementation plan
+- `62c2a4c` — reusable solver and battle sessions
+- `a8b43f9` — Streamlit acceptance GUI
+- `9faef4b` — battle target-support regression test
+
+What changed:
+- Added `bayesian_hardle.application` as the shared application/session layer.
+  `SolverSession` and `run_simulation` preserve the ISSUE-006 exact solver;
+  `BattleSession` advances one human turn plus one hidden solver turn and
+  returns a redacted `BattlePublicState` until human solve, horizon, or give-up.
+- Refactored the CLI to use the shared application services while preserving
+  `simulate`, `live`, and `compare` behavior and adding cumulative per-turn
+  timing to the existing transcript shape.
+- Added `streamlit_app.py` with Strategy comparison and Human vs Solver tabs,
+  support/prior explanations, readable per-turn tables, progress indication,
+  explicit diagnostic labeling for curated-2315, and no exact Bayes-optimal
+  option outside its tractability scope.
+- Added Streamlit to the project dependencies and documented the exact uv
+  launch command. The GUI stores the battle service object in Streamlit state
+  but renders solver details only from a finished public view.
+- Added session-layer, anti-leak, target-validation, support-sampling, and
+  Streamlit smoke/AppTest coverage.
+
+Fresh verification evidence:
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue007-pycache python3 -m unittest discover -s tests -v` — `66` tests passed, `2` Streamlit-only tests skipped because the default Python lacks the optional GUI dependency.
+- `uv run --with . python -m unittest discover -s tests -v` — `66/66` passed, including Streamlit import and initial-page AppTest.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue007-pycache python3 -m compileall -q src tests experiments`, `git diff --check`, and package/module imports — passed.
+- Known-target `aahed` under real full-uniform support `12,974`: MAP solved in `1` turn; exact Max-IG solved in `7` turns. See `docs/acceptance/issue_007_gui_sample_transcript.md` for the captured outputs.
+- Streamlit AppTest clicked the comparison Run path and observed solved MAP/Max-IG result cards/tables. Battle AppTest observed no solver table before finish, human-only feedback columns after a non-terminal guess, and solver trajectory columns only after Give up.
+- The exact launch command `uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py --server.headless true --server.port 8505` reached `http://localhost:8505` on this Mac. A normal browser connector was unavailable in this environment, so browser visual evidence is represented by Streamlit AppTest rather than a screenshot.
+- `project-control/PROJECT_STATE.md` had no diff against the ISSUE-006 base.
+
+Evidence paths:
+- `docs/superpowers/specs/2026-10-25-interactive-browser-gui-design.md`
+- `docs/superpowers/plans/2026-10-25-interactive-browser-gui.md`
+- `docs/acceptance/issue_007_gui_sample_transcript.md`
+- `src/bayesian_hardle/application.py`
+- `src/bayesian_hardle/streamlit_app.py`
+- `tests/test_application_sessions.py`
+- `tests/test_streamlit_smoke.py`
+
+Known limitations:
+- The first full-support Max-IG run may construct the exact `uint8` matrix
+  cache under `.cache/bayesian_hardle` (about 160.6 MiB for the 12,974 x 12,974
+  support); later runs reuse it.
+- Streamlit AppTest and local server startup are local behavioral evidence, not
+  physical-browser, remote, or business acceptance.
+- ISSUE-006 and ISSUE-007 remain pending independent SUPERVISOR review; this
+  report does not modify or advance `PROJECT_STATE.md`.
