@@ -1,0 +1,11 @@
+{
+  "issue": "ISSUE-006",
+  "seed": 20261029,
+  "max_guesses": 10,
+  "warm_first_move_repeats": 3,
+  "representative_targets": ["aahed", "padel", "cigar", "civic"],
+  "broad_target_count": 6,
+  "broad_benchmark_horizon": 5,
+  "frequency_source": "wordfreq==3.1.1",
+  "frequency_language": "en"
+}

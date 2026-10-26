@@ -41,7 +41,7 @@ class BeliefState:
 
     @property
     def total_mass(self) -> float:
-        return sum(value for _, value in self.probability_mass)
+        return math.fsum(value for _, value in self.probability_mass)
 
     def mass_for(self, word: str) -> float:
         for candidate, value in self.probability_mass:

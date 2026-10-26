@@ -1,0 +1,505 @@
+{
+  "broad_benchmark": {
+    "exhaustive": false,
+    "requested_horizon": 5,
+    "runs": [
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": true,
+        "target": "aahed",
+        "total_time_ms": 19.380500000000467,
+        "turns": 1
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "padel",
+        "total_time_ms": 20.529791999999603,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "qaids",
+        "total_time_ms": 24.712499999999693,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": false,
+        "policy": "map",
+        "solved": false,
+        "target": "mushy",
+        "total_time_ms": 32.30016700000071,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "femmy",
+        "total_time_ms": 31.035000000001034,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "souce",
+        "total_time_ms": 30.2441249999994,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "aahed",
+        "total_time_ms": 771.4291249999992,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": true,
+        "target": "padel",
+        "total_time_ms": 743.0137499999994,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "qaids",
+        "total_time_ms": 693.6416249999997,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": false,
+        "policy": "max-ig",
+        "solved": true,
+        "target": "mushy",
+        "total_time_ms": 776.0820420000006,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "femmy",
+        "total_time_ms": 798.286000000001,
+        "turns": 5
+      },
+      {
+        "mode": "full-uniform",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": true,
+        "target": "souce",
+        "total_time_ms": 756.6572090000001,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "aahed",
+        "total_time_ms": 24.964083000000414,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "padel",
+        "total_time_ms": 45.77224999999885,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "qaids",
+        "total_time_ms": 44.5718339999992,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": false,
+        "policy": "map",
+        "solved": false,
+        "target": "mushy",
+        "total_time_ms": 45.4287089999994,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": false,
+        "target": "femmy",
+        "total_time_ms": 29.071583000000345,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "map",
+        "solved": true,
+        "target": "souce",
+        "total_time_ms": 29.90729200000075,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "aahed",
+        "total_time_ms": 716.3832499999999,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": true,
+        "target": "padel",
+        "total_time_ms": 800.3484169999986,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "qaids",
+        "total_time_ms": 851.1626249999971,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": false,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "mushy",
+        "total_time_ms": 919.5870419999999,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": false,
+        "target": "femmy",
+        "total_time_ms": 915.073875000001,
+        "turns": 5
+      },
+      {
+        "mode": "full-frequency",
+        "outside_curated_2315": true,
+        "policy": "max-ig",
+        "solved": true,
+        "target": "souce",
+        "total_time_ms": 694.6450000000013,
+        "turns": 5
+      }
+    ],
+    "seed": 20261029,
+    "selection": "seeded random sample with aahed/padel inclusion",
+    "targets": [
+      "aahed",
+      "padel",
+      "qaids",
+      "mushy",
+      "femmy",
+      "souce"
+    ]
+  },
+  "config": {
+    "broad_benchmark_horizon": 5,
+    "broad_target_count": 6,
+    "frequency_language": "en",
+    "frequency_source": "wordfreq==3.1.1",
+    "issue": "ISSUE-006",
+    "max_guesses": 10,
+    "representative_targets": [
+      "aahed",
+      "padel",
+      "cigar",
+      "civic"
+    ],
+    "seed": 20261029,
+    "warm_first_move_repeats": 3
+  },
+  "issue": "ISSUE-006",
+  "machine": {
+    "platform": "macOS-26.6.1-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.9.6"
+  },
+  "matrix": {
+    "cache_key": "dc6485a06cdb44dd3bed79bfaacf718a4c19027409b4788a47d940552479731e",
+    "cache_path_suffix": "feedback-dc6485a06cdb44dd3bed79bfaacf718a4c19027409b4788a47d940552479731e.npy",
+    "cold_build_seconds": 2.963542542,
+    "disk_bytes": 168324804,
+    "memory_bytes": 168324676,
+    "rss_peak_after_build_bytes": 437387264,
+    "rss_peak_before_bytes": 29310976,
+    "rss_peak_delta_bytes": 408076288,
+    "warm_load_seconds": 0.007339749999999867
+  },
+  "representative_interactive_latency": [
+    {
+      "decision_ms": [
+        565.9876669999999,
+        106.49887499999977,
+        58.439915999999315,
+        16.658999999999757,
+        8.041541999999957,
+        4.376458000000305,
+        1.709833999999688
+      ],
+      "mode": "full-uniform",
+      "outside_curated_2315": true,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "aahed",
+      "total_time_ms": 765.5747910000006,
+      "turns": 7
+    },
+    {
+      "decision_ms": [
+        559.1674590000002,
+        107.64512499999945,
+        57.01050000000052,
+        9.066583999999267,
+        1.688167000001073
+      ],
+      "mode": "full-uniform",
+      "outside_curated_2315": true,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "padel",
+      "total_time_ms": 738.2200839999999,
+      "turns": 5
+    },
+    {
+      "decision_ms": [
+        560.3315000000002,
+        119.4432919999997,
+        65.46979200000003,
+        56.466874999999916,
+        1.7821250000000788
+      ],
+      "mode": "full-uniform",
+      "outside_curated_2315": false,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "cigar",
+      "total_time_ms": 807.9507499999999,
+      "turns": 5
+    },
+    {
+      "decision_ms": [
+        568.9627500000007,
+        91.07437499999982,
+        61.15820900000024,
+        5.075790999999441,
+        1.7040830000016882
+      ],
+      "mode": "full-uniform",
+      "outside_curated_2315": false,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "civic",
+      "total_time_ms": 731.1987500000008,
+      "turns": 5
+    },
+    {
+      "decision_ms": [
+        558.8350829999999,
+        78.14729200000059,
+        58.57345900000155,
+        10.218915999999467,
+        4.181208000000325,
+        1.7912920000000554
+      ],
+      "mode": "full-frequency",
+      "outside_curated_2315": true,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "aahed",
+      "total_time_ms": 715.2443329999993,
+      "turns": 6
+    },
+    {
+      "decision_ms": [
+        562.7060830000001,
+        150.41408399999943,
+        74.58808300000008,
+        5.424707999999612,
+        1.6588330000004703
+      ],
+      "mode": "full-frequency",
+      "outside_curated_2315": true,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "padel",
+      "total_time_ms": 802.1881249999989,
+      "turns": 5
+    },
+    {
+      "decision_ms": [
+        562.6092499999995,
+        118.9279170000006,
+        64.72220799999917,
+        19.278999999999158,
+        3.289749999998648
+      ],
+      "mode": "full-frequency",
+      "outside_curated_2315": false,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "cigar",
+      "total_time_ms": 774.6597499999997,
+      "turns": 5
+    },
+    {
+      "decision_ms": [
+        568.7863340000004,
+        120.62995800000031,
+        65.68945799999959,
+        7.662082999999598,
+        4.222916999999882,
+        1.6121250000011855
+      ],
+      "mode": "full-frequency",
+      "outside_curated_2315": false,
+      "solved": true,
+      "statuses": [
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "CONTINUE",
+        "SOLVED"
+      ],
+      "target": "civic",
+      "total_time_ms": 773.9148750000008,
+      "turns": 6
+    }
+  ],
+  "status": "executor-evidence",
+  "vocabulary": {
+    "curated_count": 2315,
+    "full_support_matrix_shape": [
+      12974,
+      12974
+    ],
+    "legal_count": 12974
+  },
+  "warm_first_move_max_ig": [
+    {
+      "entropy_bits": 13.663335723475091,
+      "frequency_provenance": null,
+      "guesses": [
+        "tares",
+        "tares",
+        "tares"
+      ],
+      "label": "full-uniform (PRIMARY STRICT FAIRNESS)",
+      "max_decision_ms": 555.6022920000001,
+      "mean_decision_ms": 549.2210416666668,
+      "min_decision_ms": 545.0642499999998,
+      "mode": "full-uniform",
+      "support_count": 12974
+    },
+    {
+      "entropy_bits": 9.210169835696366,
+      "frequency_provenance": {
+        "answer_membership_used": false,
+        "frequency_metric": "Zipf frequency",
+        "human_like_heuristic": true,
+        "language": "en",
+        "positive_floor": 1e-12,
+        "source": "wordfreq",
+        "support": "all legal Hardle words",
+        "support_count": 12974,
+        "transformation": "max(10 ** zipf_frequency(word, 'en'), 1e-12)",
+        "version": "3.1.1"
+      },
+      "guesses": [
+        "thrae",
+        "thrae",
+        "thrae"
+      ],
+      "label": "full-frequency (PRIMARY HUMAN-LIKE EXPLORATORY)",
+      "max_decision_ms": 554.5627080000006,
+      "mean_decision_ms": 550.2458333333336,
+      "min_decision_ms": 545.6858330000002,
+      "mode": "full-frequency",
+      "support_count": 12974
+    }
+  ]
+}

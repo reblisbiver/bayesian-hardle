@@ -1,6 +1,10 @@
 """Bayesian Hardle research package."""
 
-from .accelerated import ExactFeedbackCodeMatrix, MatrixInformationGainCalculator
+from .accelerated import (
+    ExactFeedbackCodeMatrix,
+    MatrixInformationGainCalculator,
+    MatrixPosteriorUpdater,
+)
 from .belief import (
     BeliefState,
     DeterministicLikelihoodModel,
@@ -10,6 +14,12 @@ from .belief import (
     PosteriorUpdater,
     PriorModel,
     UniformPrior,
+)
+from .fairness import (
+    FrequencyDependencyError,
+    GeneralEnglishFrequencyPrior,
+    HypothesisMode,
+    resolve_hypothesis_mode,
 )
 from .decision import (
     BayesOptimalPlanner,
@@ -86,6 +96,7 @@ __all__ = [
     "LikelihoodModel",
     "MAPPolicy",
     "MatrixInformationGainCalculator",
+    "MatrixPosteriorUpdater",
     "MaxInformationGainPolicy",
     "POLICY_TIE_TOLERANCE",
     "MetricsResult",
@@ -102,6 +113,10 @@ __all__ = [
     "ShannonEntropyCalculator",
     "TerminalRules",
     "UniformPrior",
+    "FrequencyDependencyError",
+    "GeneralEnglishFrequencyPrior",
+    "HypothesisMode",
+    "resolve_hypothesis_mode",
     "VocabularyRepository",
     "WordListVocabularyRepository",
     "__version__",

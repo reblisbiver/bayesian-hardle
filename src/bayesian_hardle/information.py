@@ -118,10 +118,13 @@ class ShannonEntropyCalculator:
             probabilities = (uniform for _ in belief.candidates)
         else:
             raise ValueError("belief must contain candidates")
-        return -sum(
-            probability * math.log2(probability)
-            for probability in probabilities
-            if probability > 0
+        return max(
+            0.0,
+            -sum(
+                probability * math.log2(probability)
+                for probability in probabilities
+                if probability > 0
+            ),
         )
 
 

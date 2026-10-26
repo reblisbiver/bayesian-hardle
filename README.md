@@ -65,3 +65,69 @@ answers and 12,974 legal guesses. Full Max-IG uses that same scope; its
 configured wall-clock limit is reported as a scaling measurement if reached,
 not replaced by a smaller vocabulary. Exact Bellman planning is deliberately
 restricted to the declared small scope.
+
+## Interactive acceptance / try it yourself (ISSUE-006)
+
+Install the project from this worktree to enable both the console script and
+the pinned general-English frequency source:
+
+```bash
+python3 -m pip install .
+```
+
+The equivalent module entrypoint is available from the repository root. The
+three explicit hypothesis/prior modes are:
+
+- `full-uniform` — PRIMARY STRICT FAIRNESS; all 12,974 legal words, uniform.
+- `full-frequency` — PRIMARY HUMAN-LIKE EXPLORATORY; all 12,974 legal words,
+  positive `wordfreq==3.1.1` English Zipf-frequency mass, with no scheduled
+  answer-list membership.
+- `curated-2315` — DIAGNOSTIC / ANSWER-LIST-AWARE only; the historical 2,315
+  candidate-answer support, retained for comparison and not the primary
+  fairness claim.
+
+Simulate a target known to the OWNER. `aahed` is legal but outside the curated
+2,315 list, so it is a useful fairness smoke test:
+
+```bash
+bayesian-hardle simulate --target aahed --mode full-uniform --policy max-ig
+python3 -m bayesian_hardle.cli simulate --target aahed \
+  --mode full-frequency --policy map --max-guesses 20
+```
+
+The solver prints the mode label, policy, guess, Hardle feedback, remaining
+candidate count, entropy in bits, decision time in milliseconds, and the top
+five posterior words on every turn. Max-IG builds or reuses a vocabulary-keyed
+exact `uint8` matrix under `.cache/bayesian_hardle/`; the matrix is about
+160.6 MiB for full support.
+
+For live assistance, enter the two numbers returned by the real website. A
+malformed or posterior-impossible observation is rejected without changing the
+belief state; `q`, Ctrl-D, or Ctrl-C exits cleanly:
+
+```bash
+python3 -m bayesian_hardle.cli live --mode full-uniform --policy max-ig
+# at each prompt, enter for example: 0 0
+```
+
+Independent policy/mode comparisons are also available:
+
+```bash
+bayesian-hardle compare --target aahed \
+  --modes full-uniform full-frequency \
+  --policies map max-ig --max-guesses 10
+```
+
+The benchmark and acceptance transcript are kept in
+[`experiments/results/issue_006_fair_client_summary.md`](experiments/results/issue_006_fair_client_summary.md),
+[`experiments/results/issue_006_fair_client.json`](experiments/results/issue_006_fair_client.json),
+and [`docs/acceptance/issue_006_sample_transcript.md`](docs/acceptance/issue_006_sample_transcript.md).
+The frequency prior is a reproducible human-like heuristic, not a claim about
+the true Hardle target-generating process.
+
+To refresh the machine-readable performance evidence after installing the
+project dependencies:
+
+```bash
+PYTHONPATH=src python3 experiments/issue_006_fair_client.py
+```

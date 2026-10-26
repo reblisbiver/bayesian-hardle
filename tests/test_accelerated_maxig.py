@@ -1,13 +1,17 @@
 import sys
 import unittest
 import random
+import tempfile
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from bayesian_hardle.accelerated import ExactFeedbackCodeMatrix  # noqa: E402
+from bayesian_hardle.accelerated import (  # noqa: E402
+    ExactFeedbackCodeMatrix,
+    MatrixPosteriorUpdater,
+)
 from bayesian_hardle.game import (  # noqa: E402
     HardleFeedbackEngine,
     WordListVocabularyRepository,
@@ -59,6 +63,52 @@ class AcceleratedMaxIGTests(unittest.TestCase):
         self.assertEqual(matrix.matrix.dtype.name, "uint8")
         self.assertFalse(matrix.matrix.flags.writeable)
 
+    def test_full_support_matrix_cache_matches_feedback_and_reloads(self):
+        vocabulary = WordListVocabularyRepository.from_repository_root(PROJECT_ROOT)
+        legal = tuple(vocabulary.legal_guesses())
+        scalar = HardleFeedbackEngine()
+        rng = random.Random(20261028)
+
+        with tempfile.TemporaryDirectory() as cache_dir:
+            matrix = ExactFeedbackCodeMatrix.load_or_build(
+                legal,
+                legal,
+                cache_dir=cache_dir,
+            )
+            self.assertEqual(matrix.matrix.shape, (12974, 12974))
+            self.assertEqual(matrix.matrix.dtype.name, "uint8")
+            self.assertEqual(matrix.memory_bytes, 12974 * 12974)
+            self.assertGreater(matrix.disk_bytes, matrix.memory_bytes - 4096)
+            self.assertTrue(matrix.storage_path.name.endswith(".npy"))
+
+            for _ in range(10000):
+                guess = rng.choice(legal)
+                answer = rng.choice(legal)
+                self.assertEqual(
+                    matrix.decode_code(matrix.code_for(guess, answer)),
+                    scalar.evaluate(guess, answer),
+                )
+
+            full_belief = UniformPrior().initial_belief(legal)
+            filtered = MatrixPosteriorUpdater(matrix).update(
+                full_belief,
+                "cigar",
+                scalar.evaluate("cigar", "aahed"),
+            )
+            self.assertIn("aahed", filtered.candidates)
+
+            reloaded = ExactFeedbackCodeMatrix.load_or_build(
+                legal,
+                legal,
+                cache_dir=cache_dir,
+            )
+            self.assertEqual(reloaded.vocabulary_identity, matrix.vocabulary_identity)
+            self.assertEqual(reloaded.matrix.shape, matrix.matrix.shape)
+            self.assertEqual(
+                reloaded.code_for("cigar", "civic"),
+                matrix.code_for("cigar", "civic"),
+            )
+
     def test_weighted_matrix_entropy_matches_reference_on_random_beliefs(self):
         vocabulary = WordListVocabularyRepository.from_repository_root(PROJECT_ROOT)
         legal = tuple(vocabulary.legal_guesses()[:80])
@@ -88,6 +138,36 @@ class AcceleratedMaxIGTests(unittest.TestCase):
                 expected = reference.calculate(belief, guess, distribution)
                 actual = accelerated.calculate(belief, guess)
                 self.assertAlmostEqual(actual, expected, delta=1e-12)
+
+    def test_matrix_posterior_filter_matches_scalar_reference(self):
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        answers = ("allee", "eagle", "llama", "belle", "civic")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, answers)
+        scalar = HardleFeedbackEngine()
+        scalar_updater = ExactPosteriorUpdater(scalar)
+        matrix_updater = MatrixPosteriorUpdater(matrix)
+        belief = BeliefState(
+            candidates=answers,
+            probability_mass=(
+                ("allee", 0.1),
+                ("eagle", 0.2),
+                ("llama", 0.3),
+                ("belle", 0.15),
+                ("civic", 0.25),
+            ),
+        )
+
+        for guess in legal:
+            feedback = scalar.evaluate(guess, "llama")
+            expected = scalar_updater.update(belief, guess, feedback)
+            actual = matrix_updater.update(belief, guess, feedback)
+            self.assertEqual(actual.candidates, expected.candidates)
+            self.assertEqual(actual.observations, expected.observations)
+            for actual_mass, expected_mass in zip(
+                actual.probability_mass, expected.probability_mass
+            ):
+                self.assertEqual(actual_mass[0], expected_mass[0])
+                self.assertAlmostEqual(actual_mass[1], expected_mass[1], delta=1e-15)
 
     def test_fast_and_reference_policies_choose_identical_actions_and_cache(self):
         scalar = HardleFeedbackEngine()

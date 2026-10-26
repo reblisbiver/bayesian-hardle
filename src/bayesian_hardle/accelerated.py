@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
+import os
+from pathlib import Path
 from typing import Iterable, Sequence, Tuple
 
 import numpy as np
 
 from .game import _normalise_word
-from .belief import BeliefState
+from .belief import BeliefState, ImpossibleObservationError
 
 
 class ExactFeedbackCodeMatrix:
@@ -27,6 +31,8 @@ class ExactFeedbackCodeMatrix:
         candidate_answers: Sequence[str],
         codes: np.ndarray,
         word_length: int = 5,
+        storage_path: str | Path | None = None,
+        vocabulary_identity: str | None = None,
     ) -> None:
         self.legal_guesses = tuple(legal_guesses)
         self.candidate_answers = tuple(candidate_answers)
@@ -43,6 +49,10 @@ class ExactFeedbackCodeMatrix:
             raise ValueError("codes must be a uint8 matrix matching the vocabularies")
         self._codes = codes
         self._codes.setflags(write=False)
+        self._storage_path = Path(storage_path) if storage_path is not None else None
+        self._vocabulary_identity = vocabulary_identity or self.identity_for(
+            self.legal_guesses, self.candidate_answers, word_length
+        )
         self._guess_indices = {
             word: index for index, word in enumerate(self.legal_guesses)
         }
@@ -68,6 +78,132 @@ class ExactFeedbackCodeMatrix:
             raise ValueError("legal guesses must be unique")
         if len(set(answers)) != len(answers):
             raise ValueError("candidate answers must be unique")
+        codes = np.empty((len(legal), len(answers)), dtype=np.uint8)
+        cls._build_codes(legal, answers, codes, word_length, guess_chunk_size)
+        return cls(legal, answers, codes, word_length)
+
+    @classmethod
+    def load_or_build(
+        cls,
+        legal_guesses: Iterable[str],
+        candidate_answers: Iterable[str],
+        cache_dir: str | Path,
+        word_length: int = 5,
+        guess_chunk_size: int = _DEFAULT_GUESS_CHUNK_SIZE,
+    ) -> "ExactFeedbackCodeMatrix":
+        """Load an exact matrix from a vocabulary-keyed NumPy cache or build it.
+
+        The matrix is written as a read-only ``.npy`` memmap after a complete
+        temporary build.  Metadata repeats the vocabulary identity, shape, and
+        dtype so a stale or partial cache cannot be mistaken for a valid one.
+        """
+
+        legal = tuple(_normalise_word(word, word_length) for word in legal_guesses)
+        answers = tuple(_normalise_word(word, word_length) for word in candidate_answers)
+        if guess_chunk_size <= 0:
+            raise ValueError("guess_chunk_size must be positive")
+        if not legal or not answers:
+            raise ValueError("legal guesses and candidate answers cannot be empty")
+        if len(set(legal)) != len(legal):
+            raise ValueError("legal guesses must be unique")
+        if len(set(answers)) != len(answers):
+            raise ValueError("candidate answers must be unique")
+
+        cache = Path(cache_dir)
+        cache.mkdir(parents=True, exist_ok=True)
+        identity = cls.identity_for(legal, answers, word_length)
+        matrix_path = cache / f"feedback-{identity}.npy"
+        metadata_path = cache / f"feedback-{identity}.json"
+        metadata = {
+            "format": 1,
+            "vocabulary_identity": identity,
+            "word_length": word_length,
+            "shape": [len(legal), len(answers)],
+            "dtype": "uint8",
+            "feedback_encoding": "exact * (word_length + 1) + misplaced",
+        }
+
+        if matrix_path.exists() and metadata_path.exists():
+            try:
+                saved = json.loads(metadata_path.read_text(encoding="utf-8"))
+                codes = np.load(matrix_path, mmap_mode="r")
+                if saved == metadata and codes.shape == tuple(metadata["shape"]):
+                    return cls(
+                        legal,
+                        answers,
+                        codes,
+                        word_length,
+                        storage_path=matrix_path,
+                        vocabulary_identity=identity,
+                    )
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                pass
+
+        temporary_path = cache / (
+            f".feedback-{identity}.{os.getpid()}.tmp.npy"
+        )
+        temporary_metadata = cache / (
+            f".feedback-{identity}.{os.getpid()}.tmp.json"
+        )
+        try:
+            codes = np.lib.format.open_memmap(
+                temporary_path,
+                mode="w+",
+                dtype=np.uint8,
+                shape=(len(legal), len(answers)),
+            )
+            cls._build_codes(legal, answers, codes, word_length, guess_chunk_size)
+            codes.flush()
+            del codes
+            temporary_metadata.write_text(
+                json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temporary_path, matrix_path)
+            os.replace(temporary_metadata, metadata_path)
+        finally:
+            for path in (temporary_path, temporary_metadata):
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+        codes = np.load(matrix_path, mmap_mode="r")
+        return cls(
+            legal,
+            answers,
+            codes,
+            word_length,
+            storage_path=matrix_path,
+            vocabulary_identity=identity,
+        )
+
+    @staticmethod
+    def identity_for(
+        legal_guesses: Sequence[str],
+        candidate_answers: Sequence[str],
+        word_length: int = 5,
+    ) -> str:
+        payload = json.dumps(
+            {
+                "word_length": word_length,
+                "legal_guesses": list(legal_guesses),
+                "candidate_answers": list(candidate_answers),
+            },
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    @classmethod
+    def _build_codes(
+        cls,
+        legal: Sequence[str],
+        answers: Sequence[str],
+        codes: np.ndarray,
+        word_length: int,
+        guess_chunk_size: int,
+    ) -> None:
+        """Fill a uint8 array with exact duplicate-aware Hardle codes."""
 
         guess_codes = cls._encode_words(legal, word_length)
         answer_codes = cls._encode_words(answers, word_length)
@@ -88,7 +224,6 @@ class ExactFeedbackCodeMatrix:
             unique_letters[index, : len(letters)] = letters
             unique_counts[index, : len(counts)] = counts
 
-        codes = np.empty((len(legal), len(answers)), dtype=np.uint8)
         for start in range(0, len(legal), guess_chunk_size):
             stop = min(start + guess_chunk_size, len(legal))
             guess_chunk = guess_codes[start:stop]
@@ -106,7 +241,6 @@ class ExactFeedbackCodeMatrix:
                 + misplaced.astype(np.uint16)
             ).astype(np.uint8)
             codes[start:stop] = encoded.T
-        return cls(legal, answers, codes, word_length)
 
     @staticmethod
     def _code_base(word_length: int) -> int:
@@ -128,6 +262,22 @@ class ExactFeedbackCodeMatrix:
     @property
     def memory_bytes(self) -> int:
         return int(self._codes.nbytes)
+
+    @property
+    def disk_bytes(self) -> int:
+        if self._storage_path is None:
+            return 0
+        return int(self._storage_path.stat().st_size)
+
+    @property
+    def storage_path(self) -> Path:
+        if self._storage_path is None:
+            raise ValueError("matrix was not loaded from a disk cache")
+        return self._storage_path
+
+    @property
+    def vocabulary_identity(self) -> str:
+        return self._vocabulary_identity
 
     @property
     def code_count(self) -> int:
@@ -165,6 +315,61 @@ class ExactFeedbackCodeMatrix:
         ):
             raise ValueError("invalid Hardle feedback code")
         return exact, misplaced
+
+
+class MatrixPosteriorUpdater:
+    """Exact posterior filtering through a prebuilt feedback-code matrix."""
+
+    def __init__(self, matrix: ExactFeedbackCodeMatrix) -> None:
+        self.matrix = matrix
+
+    @staticmethod
+    def _mass_table(belief: BeliefState) -> Tuple[Tuple[str, float], ...]:
+        if belief.probability_mass:
+            total = belief.total_mass
+            if total <= 0:
+                raise ValueError("belief must have positive total mass")
+            return belief.probability_mass
+        if not belief.candidates:
+            raise ValueError("belief must contain candidates")
+        uniform = 1.0 / len(belief.candidates)
+        return tuple((word, uniform) for word in belief.candidates)
+
+    def update(
+        self,
+        belief: BeliefState,
+        guess: str,
+        feedback: Tuple[int, int],
+    ) -> BeliefState:
+        observed = tuple(feedback)
+        exact, misplaced = self.matrix.decode_code(
+            int(observed[0]) * self.matrix._code_base + int(observed[1])
+        )
+        if (exact, misplaced) != observed:
+            raise ValueError("invalid Hardle feedback")
+        mass_table = self._mass_table(belief)
+        words = tuple(word for word, _ in mass_table)
+        indices = self.matrix.answer_indices(words)
+        code = exact * self.matrix._code_base + misplaced
+        row = self.matrix.row_for(guess)
+        retained = [
+            (word, mass)
+            for word, mass, value in zip(words, (mass for _, mass in mass_table), row[indices])
+            if int(value) == code
+        ]
+        retained_mass = math.fsum(mass for _, mass in retained)
+        if retained_mass <= 0:
+            raise ImpossibleObservationError(
+                "observation has zero posterior mass: " + repr(observed)
+            )
+        normalized = tuple(
+            (target, mass / retained_mass) for target, mass in retained
+        )
+        return BeliefState(
+            candidates=tuple(target for target, _ in normalized),
+            observations=belief.observations + ((guess, observed),),
+            probability_mass=normalized,
+        )
 
 
 class MatrixInformationGainCalculator:
