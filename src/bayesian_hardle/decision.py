@@ -332,7 +332,7 @@ class ExactBayesOptimalPlanner:
         "horizon_two_child_batch",
         "root_horizon_two_ordering",
     )
-    HORIZON_TWO_CHILD_BATCH_SIZE = 8
+    HORIZON_TWO_CHILD_BATCH_SIZE = 2
 
     _STAT_KEYS = (
         "states_evaluated",
@@ -379,8 +379,13 @@ class ExactBayesOptimalPlanner:
         self.cache_hits = 0
         self.cache_misses = 0
         self._value_cache: Dict[Hashable, PlannerValue] = {}
+        default_layers = tuple(
+            layer
+            for layer in self.ALL_OPTIMIZATION_LAYERS
+            if layer != "horizon_two_child_batch"
+        )
         requested = (
-            self.ALL_OPTIMIZATION_LAYERS
+            default_layers
             if optimization_layers is None
             else tuple(optimization_layers)
         )
@@ -970,6 +975,10 @@ class ExactBayesOptimalPlanner:
                     branch_record = record["branches"][branch_index]
                     branch_record["child_state_key"] = self._key_digest(child_key)
                 child_cache_hits_before = self.cache_hits
+                child_exact_before = (
+                    self.stats["horizon_two_batch_calls"]
+                    + self.stats["horizon_two_scalar_calls"]
+                )
                 child_started = time.perf_counter()
                 next_guess = self._best_guess(
                     next_state,
@@ -997,6 +1006,12 @@ class ExactBayesOptimalPlanner:
                     )
                 if next_success is None or next_expected is None:
                     raise RuntimeError("best child action was unexpectedly pruned")
+                child_exact_after = (
+                    self.stats["horizon_two_batch_calls"]
+                    + self.stats["horizon_two_scalar_calls"]
+                )
+                if child_exact_after > child_exact_before:
+                    self.stats["horizon_two_child_exact_solves"] += 1
                 success_probability += probability * next_success
                 expected_guesses += probability * next_expected
             processed_probability += probability
@@ -1324,7 +1339,7 @@ class ExactBayesOptimalPlanner:
                 ),
             )
             self.stats["horizon_two_child_exact_solves"] += len(batch_items)
-            for local_index, (index, item, _, _) in enumerate(batch_items):
+            for local_index, (index, item, answer_words, _) in enumerate(batch_items):
                 next_state = item["state"]
                 state_key = item["key"]
                 assert isinstance(next_state, DecisionState)
@@ -1340,7 +1355,7 @@ class ExactBayesOptimalPlanner:
                 self.stats["horizon_two_batch_actions"] += len(legal)
                 self.stats["horizon_two_batch_matrix_cells"] += len(
                     legal
-                ) * len(item["state"].belief.candidates)
+                ) * len(answer_words)
                 results[index] = (next_guess, value, False, True)
 
         if any(result is None for result in results):

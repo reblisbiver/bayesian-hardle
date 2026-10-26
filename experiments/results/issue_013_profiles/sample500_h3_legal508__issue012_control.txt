@@ -1,0 +1,58 @@
+         19893497 function calls (19887907 primitive calls) in 6.003 seconds
+
+   Ordered by: cumulative time
+   List reduced from 116 to 50 due to restriction <50>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    6.005    6.005 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:558(select_guess)
+   2796/1    0.028    0.000    6.005    6.005 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:585(_best_guess)
+ 3304/509    0.055    0.000    5.987    0.012 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:727(_guess_value)
+     2761    2.512    0.001    4.966    0.002 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1084(_horizon_two_best_guess)
+     2761    0.010    0.000    2.158    0.001 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1144(_horizon_two_batch_values)
+     2762    0.341    0.000    1.978    0.001 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:304(horizon_two_values)
+  1403096    0.953    0.000    0.953    0.000 {method 'at' of 'numpy.ufunc' objects}
+    11656    0.015    0.000    0.506    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:518(_canonical_key)
+  1405858    0.334    0.000    0.334    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:355(<genexpr>)
+    18230    0.065    0.000    0.326    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:539(_mass_table)
+    26078    0.082    0.000    0.284    0.000 {built-in method builtins.sorted}
+  1189151    0.201    0.000    0.201    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:535(<genexpr>)
+     2761    0.017    0.000    0.171    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1166(_horizon_two_batch_inputs)
+  1399831    0.133    0.000    0.160    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1026(_value_is_better)
+     2795    0.016    0.000    0.159    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1604(_posterior_for_branch)
+    27527    0.079    0.000    0.144    0.000 {built-in method math.fsum}
+  2163663    0.133    0.000    0.133    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:545(<genexpr>)
+     2795    0.002    0.000    0.132    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:425(_key_digest)
+    18230    0.016    0.000    0.129    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/belief.py:42(total_mass)
+     6042    0.047    0.000    0.127    0.000 {built-in method builtins.all}
+     8319    0.048    0.000    0.126    0.000 {built-in method builtins.any}
+     2795    0.120    0.000    0.120    0.000 {built-in method builtins.repr}
+     2762    0.071    0.000    0.102    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:352(<listcomp>)
+      508    0.046    0.000    0.094    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1547(_transition_branches)
+     2795    0.024    0.000    0.093    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/belief.py:23(__post_init__)
+  1405349    0.060    0.000    0.060    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1181(<genexpr>)
+    14318    0.052    0.000    0.052    0.000 {built-in method numpy.asarray}
+  2163663    0.049    0.000    0.049    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/belief.py:44(<genexpr>)
+  1405858    0.048    0.000    0.048    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:325(<genexpr>)
+     2761    0.044    0.000    0.044    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1098(<dictcomp>)
+  1418473    0.041    0.000    0.041    0.000 {method 'get' of 'dict' objects}
+     2762    0.038    0.000    0.038    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:339(<listcomp>)
+      522    0.007    0.000    0.034    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1415(_closed_form_guess_value)
+     3270    0.001    0.000    0.034    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:298(contains_answers)
+   233895    0.033    0.000    0.033    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/belief.py:26(<genexpr>)
+     2776    0.002    0.000    0.030    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1062(_closed_form_best_guess)
+      508    0.007    0.000    0.028    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1527(_can_use_matrix)
+  1412636    0.026    0.000    0.026    0.000 {built-in method builtins.abs}
+   233895    0.025    0.000    0.025    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1616(<genexpr>)
+   233895    0.017    0.000    0.021    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/belief.py:36(<genexpr>)
+   486965    0.020    0.000    0.020    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:299(<genexpr>)
+     8286    0.020    0.000    0.020    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+      508    0.002    0.000    0.019    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1572(<listcomp>)
+     2762    0.001    0.000    0.016    0.000 {method 'sum' of 'numpy.ndarray' objects}
+     2762    0.000    0.000    0.016    0.000 /Users/darwin/Library/Python/3.9/lib/python/site-packages/numpy/_core/_methods.py:50(_sum)
+     5524    0.002    0.000    0.011    0.000 /Users/darwin/Library/Python/3.9/lib/python/site-packages/numpy/_core/fromnumeric.py:2400(any)
+      508    0.000    0.000    0.011    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:292(answer_indices)
+     2762    0.010    0.000    0.010    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:335(<listcomp>)
+   233895    0.009    0.000    0.009    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/decision.py:1615(<genexpr>)
+   232457    0.009    0.000    0.009    0.000 /private/tmp/bayesian-hardle-issue-013/src/bayesian_hardle/accelerated.py:327(<genexpr>)
+
+

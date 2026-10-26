@@ -686,6 +686,7 @@ class DecisionBehaviorTests(unittest.TestCase):
         )
         block = ExactBayesOptimalPlanner(
             feedback_matrix=matrix,
+            optimization_layers=ExactBayesOptimalPlanner.ALL_OPTIMIZATION_LAYERS,
             root_audit=True,
         )
         reference = ExactBayesOptimalReferencePlanner()
@@ -724,6 +725,18 @@ class DecisionBehaviorTests(unittest.TestCase):
         )
         self.assertEqual(instrumentation["horizon_two_bound_only_skips"], 0)
         self.assertGreater(instrumentation["actions_pruned"], 0)
+        self.assertGreater(
+            control.instrumentation()["horizon_two_child_exact_solves"], 0
+        )
+
+        default = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            root_audit=True,
+        )
+        default.select_guess(state, legal, self.feedback, self.updater)
+        self.assertEqual(
+            default.instrumentation()["horizon_two_child_batch_blocks"], 0
+        )
 
 
 if __name__ == "__main__":
