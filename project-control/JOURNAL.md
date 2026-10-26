@@ -801,3 +801,37 @@ The audited handoff documentation commit is `405bd39ed8e43144af5ff12511d814e66da
 The worktree is intended to remain clean on branch
 `codex/issue-007-interactive-gui`; supervisor review is still required before
 any accepted-state advancement.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-008 Chinese GUI localization and complete policy visibility
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-008`
+Branch: `codex/issue-007-interactive-gui`
+Base SHA: `c0661fd8de38df6760b84b6370a18890982b1642`
+Implementation commit: `a7cd73f` (`feat: localize GUI and expose policy availability`)
+
+What changed:
+- Localized all Streamlit user-facing copy to natural simplified Chinese, including the page title, tabs, headers, labels, buttons, captions, help text, status/outcome labels, table columns, progress/spinner text, and GUI-supplied error wrappers. Technical mode and policy identifiers remain in parentheses where useful.
+- Set the runnable policy labels to `随机基线（Random）`, `最大后验（MAP）`, and `最大信息增益（Max-IG）`. Comparison defaults remain MAP plus Max-IG, while Random is directly selectable in both comparison and battle controls.
+- Added a visible `精确贝叶斯最优（Exact Bayes-optimal）` availability panel in both tabs. It is not present in either runnable selector, and the Chinese explanation states that accepted exact planning is currently computable and verified only on small vocabularies, so it cannot be accidentally run in 12,974-word full-support modes.
+- Preserved the existing application/solver services, the two GUI tabs, and battle secrecy. Added AppTest coverage for Chinese tabs/headings/controls, default policies, Random selection, Exact Bayes-optimal non-runnability and status text, Chinese result columns/statuses, and pre-finish solver-trajectory redaction.
+- Updated the GUI launch/usage guidance in `README.md` and the ISSUE-007 acceptance transcript without changing the uv/Streamlit launch command.
+
+Fresh verification evidence:
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . python -m unittest tests.test_streamlit_smoke -v` — `7/7` passed.
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . python -m unittest discover -s tests -v` — `70/70` passed.
+- `git diff --check` — passed before commit.
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py --server.headless true --server.port 8505` — fresh server reached `http://localhost:8505`; the temporary process was then stopped cleanly.
+- `project-control/PROJECT_STATE.md` was not modified; its pre-task SHA-256 was `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+Evidence paths:
+- `src/bayesian_hardle/streamlit_app.py`
+- `tests/test_streamlit_smoke.py`
+- `README.md`
+- `docs/acceptance/issue_007_gui_sample_transcript.md`
+
+Known boundary:
+- No exact Bayes-optimal implementation or approximation was added; the policy remains unavailable for full-support GUI execution.
+- AppTest and local Streamlit startup are local behavioral evidence, not physical-browser, remote, business, or supervisor acceptance.
+- A pre-existing untracked `uv.lock` was present before ISSUE-008 work began and was intentionally not modified or included in the implementation commit. The tracked source diff is clean at `a7cd73f`, but the worktree still reports that unrelated untracked file.
