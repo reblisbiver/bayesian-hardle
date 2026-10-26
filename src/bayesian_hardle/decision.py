@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import random
 import time
 from typing import Dict, Hashable, Optional, Protocol, Sequence, Tuple, runtime_checkable
 
 from .belief import BeliefState, PosteriorUpdater
 from .accelerated import ExactFeedbackCodeMatrix, MatrixInformationGainCalculator
-from .game import Feedback, FeedbackEngine
+from .game import Feedback, FeedbackEngine, HardleFeedbackEngine
 from .information import (
     ExactInformationGainCalculator,
     ExactOutcomePartitioner,
@@ -318,25 +319,99 @@ class ExactBayesOptimalPlanner:
     the first component ties within ``POLICY_TIE_TOLERANCE``.
     """
 
-    def __init__(self, cache: Optional[PlannerCache] = None) -> None:
+    ALL_OPTIMIZATION_LAYERS = (
+        "closed_forms",
+        "matrix_transitions",
+        "canonical_memoization",
+        "action_ordering",
+        "branch_ordering",
+        "branch_and_bound",
+    )
+
+    _STAT_KEYS = (
+        "states_evaluated",
+        "actions_evaluated",
+        "actions_completed",
+        "actions_pruned",
+        "branches_evaluated",
+        "scalar_feedback_evaluations",
+        "matrix_transition_calls",
+        "value_cache_hits",
+        "value_cache_misses",
+        "closed_form_singleton_hits",
+        "closed_form_last_horizon_hits",
+        "closed_form_two_candidate_hits",
+    )
+
+    def __init__(
+        self,
+        cache: Optional[PlannerCache] = None,
+        feedback_matrix: Optional[ExactFeedbackCodeMatrix] = None,
+        optimization_layers: Optional[Sequence[str]] = None,
+    ) -> None:
         self.cache = cache if cache is not None else InMemoryPlannerCache()
         self.cache_hits = 0
         self.cache_misses = 0
         self._value_cache: Dict[Hashable, PlannerValue] = {}
+        requested = (
+            self.ALL_OPTIMIZATION_LAYERS
+            if optimization_layers is None
+            else tuple(optimization_layers)
+        )
+        unknown = set(requested) - set(self.ALL_OPTIMIZATION_LAYERS)
+        if unknown:
+            raise ValueError(
+                "unknown exact-planner optimization layer(s): "
+                + ", ".join(sorted(unknown))
+            )
+        self.optimization_layers = tuple(
+            layer for layer in self.ALL_OPTIMIZATION_LAYERS if layer in requested
+        )
+        self.feedback_matrix = feedback_matrix
+        self.stats: Dict[str, int] = {key: 0 for key in self._STAT_KEYS}
 
-    @staticmethod
+    def _enabled(self, layer: str) -> bool:
+        return layer in self.optimization_layers
+
+    @property
+    def matrix_memory_bytes(self) -> int:
+        """Bytes held by the optional exact transition matrix."""
+
+        return self.feedback_matrix.memory_bytes if self.feedback_matrix is not None else 0
+
+    def instrumentation(self) -> Dict[str, int]:
+        """Return a stable snapshot of planner counters for benchmark artifacts."""
+
+        return {
+            **self.stats,
+            "cache_hits": self.cache_hits,
+            "cache_misses": self.cache_misses,
+            "value_cache_entries": len(self._value_cache),
+            "planner_cache_entries": len(self.cache)
+            if hasattr(self.cache, "__len__")
+            else -1,
+            "matrix_memory_bytes": self.matrix_memory_bytes,
+        }
+
+    @classmethod
     def _canonical_key(
+        cls,
         state: DecisionState,
         candidate_guesses: Sequence[str],
+        canonicalize: bool = True,
     ) -> Tuple[object, ...]:
-        mass = state.belief.probability_mass
-        if not mass:
+        if canonicalize:
+            mass = cls._mass_table(state.belief)
+        elif state.belief.probability_mass:
+            mass = tuple(state.belief.probability_mass)
+        else:
             uniform = 1.0 / len(state.belief.candidates)
             mass = tuple((word, uniform) for word in state.belief.candidates)
+        legal = tuple(sorted(candidate_guesses)) if canonicalize else tuple(candidate_guesses)
         return (
             state.remaining_guesses,
-            tuple(sorted((word, value) for word, value in mass)),
-            tuple(candidate_guesses),
+            tuple(sorted((word, float(value)) for word, value in mass)),
+            legal,
         )
 
     @staticmethod
@@ -385,32 +460,61 @@ class ExactBayesOptimalPlanner:
         feedback_engine: FeedbackEngine,
         posterior_updater: PosteriorUpdater,
     ) -> str:
-        key = self._canonical_key(state, candidate_guesses)
+        key = self._canonical_key(
+            state,
+            candidate_guesses,
+            canonicalize=self._enabled("canonical_memoization"),
+        )
         cached = self.cache.get(key)
         if cached is not None:
             self.cache_hits += 1
             return cached
         self.cache_misses += 1
-        scored = []
-        for guess in candidate_guesses:
-            success_probability, expected_guesses = self._guess_value(
-                state, guess, candidate_guesses, feedback_engine, posterior_updater
+        self.stats["states_evaluated"] += 1
+
+        closed_form = self._closed_form_best_guess(state, candidate_guesses)
+        if closed_form is not None:
+            self.cache.put(key, closed_form)
+            return closed_form
+
+        ordered = self._ordered_actions(state, candidate_guesses)
+        tie_rank = {
+            guess: index
+            for index, guess in enumerate(
+                tuple(sorted(candidate_guesses))
+                if self._enabled("canonical_memoization")
+                else tuple(candidate_guesses)
             )
-            scored.append((guess, success_probability, expected_guesses))
-        maximum_success = max(success for _, success, _ in scored)
-        success_ties = [
-            (guess, success, expected)
-            for guess, success, expected in scored
-            if maximum_success - success <= POLICY_TIE_TOLERANCE
-        ]
-        minimum_expected = min(expected for _, _, expected in success_ties)
-        best_guess = next(
-            guess
-            for guess, _, expected in success_ties
-            if expected - minimum_expected <= POLICY_TIE_TOLERANCE
-        )
-        self.cache.put(key, best_guess)
-        return best_guess
+        }
+        incumbent: Optional[PlannerValue] = None
+        incumbent_guess: Optional[str] = None
+        for guess in ordered:
+            self.stats["actions_evaluated"] += 1
+            value = self._guess_value(
+                state,
+                guess,
+                candidate_guesses,
+                feedback_engine,
+                posterior_updater,
+                incumbent=incumbent,
+            )
+            if value is None:
+                self.stats["actions_pruned"] += 1
+                continue
+            self.stats["actions_completed"] += 1
+            if incumbent is None or self._value_is_better(
+                value,
+                incumbent,
+                guess,
+                incumbent_guess,
+                tie_rank,
+            ):
+                incumbent = value
+                incumbent_guess = guess
+        if incumbent_guess is None:
+            raise RuntimeError("exact planner evaluated no complete action")
+        self.cache.put(key, incumbent_guess)
+        return incumbent_guess
 
     def _guess_value(
         self,
@@ -419,23 +523,56 @@ class ExactBayesOptimalPlanner:
         candidate_guesses: Sequence[str],
         feedback_engine: FeedbackEngine,
         posterior_updater: PosteriorUpdater,
-    ) -> PlannerValue:
-        key = ("value", self._canonical_key(state, candidate_guesses), guess)
+        incumbent: Optional[PlannerValue] = None,
+    ) -> Optional[PlannerValue]:
+        key = (
+            "value",
+            self._canonical_key(
+                state,
+                candidate_guesses,
+                canonicalize=self._enabled("canonical_memoization"),
+            ),
+            guess,
+        )
         if key in self._value_cache:
+            self.stats["value_cache_hits"] += 1
             return self._value_cache[key]
+        self.stats["value_cache_misses"] += 1
+
+        closed_form = self._closed_form_guess_value(
+            state,
+            guess,
+            candidate_guesses,
+        )
+        if closed_form is not None:
+            self._value_cache[key] = closed_form
+            return closed_form
+
         mass_table = self._mass_table(state.belief)
-        grouped: Dict[Feedback, float] = {}
-        for target, mass in mass_table:
-            outcome = tuple(feedback_engine.evaluate(guess, target))
-            grouped[outcome] = grouped.get(outcome, 0.0) + mass
+        branches = self._transition_branches(
+            state,
+            guess,
+            mass_table,
+            feedback_engine,
+        )
         success_probability = 0.0
-        expected_guesses = 0.0
-        for outcome, probability in grouped.items():
+        expected_guesses = 1.0
+        processed_probability = 0.0
+        for outcome, probability, members in branches:
+            self.stats["branches_evaluated"] += 1
             if outcome == (len(guess), 0):
                 success_probability += probability
-                expected_guesses += probability
             elif state.remaining_guesses > 1:
-                posterior = posterior_updater.update(state.belief, guess, outcome)
+                posterior = self._posterior_for_branch(
+                    state.belief,
+                    guess,
+                    outcome,
+                    members,
+                    posterior_updater,
+                    use_matrix=self._can_use_matrix(
+                        state.belief, guess, feedback_engine
+                    ),
+                )
                 next_state = DecisionState(
                     belief=posterior,
                     remaining_guesses=state.remaining_guesses - 1,
@@ -453,10 +590,215 @@ class ExactBayesOptimalPlanner:
                     feedback_engine,
                     posterior_updater,
                 )
+                if next_success is None or next_expected is None:
+                    raise RuntimeError("best child action was unexpectedly pruned")
                 success_probability += probability * next_success
-                expected_guesses += probability * (1.0 + next_expected)
-            else:
-                expected_guesses += probability
+                expected_guesses += probability * next_expected
+            processed_probability += probability
+            if incumbent is not None and self._enabled("branch_and_bound"):
+                upper_success = success_probability + max(
+                    0.0, 1.0 - processed_probability
+                )
+                if self._cannot_beat_incumbent(
+                    upper_success, expected_guesses, incumbent
+                ):
+                    return None
         value = (success_probability, expected_guesses)
         self._value_cache[key] = value
         return value
+
+    @staticmethod
+    def _value_is_better(
+        candidate: PlannerValue,
+        incumbent: PlannerValue,
+        candidate_guess: str,
+        incumbent_guess: Optional[str],
+        tie_rank: Dict[str, int],
+    ) -> bool:
+        if candidate[0] > incumbent[0] + POLICY_TIE_TOLERANCE:
+            return True
+        if abs(candidate[0] - incumbent[0]) > POLICY_TIE_TOLERANCE:
+            return False
+        if candidate[1] < incumbent[1] - POLICY_TIE_TOLERANCE:
+            return True
+        if abs(candidate[1] - incumbent[1]) > POLICY_TIE_TOLERANCE:
+            return False
+        if incumbent_guess is None:
+            return True
+        return tie_rank[candidate_guess] < tie_rank[incumbent_guess]
+
+    @staticmethod
+    def _cannot_beat_incumbent(
+        upper_success: float,
+        lower_expected: float,
+        incumbent: PlannerValue,
+    ) -> bool:
+        if upper_success < incumbent[0] - POLICY_TIE_TOLERANCE:
+            return True
+        return (
+            abs(upper_success - incumbent[0]) <= POLICY_TIE_TOLERANCE
+            # Keep equality cases alive so the planner can preserve its
+            # deterministic tie order.  A strict lower-bound loss is enough
+            # to prove that the action cannot improve the lexicographic value.
+            and lower_expected > incumbent[1] + POLICY_TIE_TOLERANCE
+        )
+
+    def _closed_form_best_guess(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+    ) -> Optional[str]:
+        if not self._enabled("closed_forms"):
+            return None
+        mass = self._mass_table(state.belief)
+        if len(mass) == 1:
+            self.stats["closed_form_singleton_hits"] += 1
+            target = mass[0][0]
+            return target if target in candidate_guesses else tuple(candidate_guesses)[0]
+        if state.remaining_guesses == 1:
+            self.stats["closed_form_last_horizon_hits"] += 1
+            return self._best_candidate_or_first(state, candidate_guesses)
+        if len(mass) == 2:
+            candidates = {word for word, _ in mass}
+            if all(candidate in candidate_guesses for candidate in candidates):
+                self.stats["closed_form_two_candidate_hits"] += 1
+                return self._best_candidate_or_first(state, candidate_guesses)
+        return None
+
+    def _best_candidate_or_first(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+    ) -> str:
+        mass = dict(self._mass_table(state.belief))
+        ranked = [
+            (index, guess, mass[guess])
+            for index, guess in enumerate(candidate_guesses)
+            if guess in mass
+        ]
+        if not ranked:
+            return tuple(candidate_guesses)[0]
+        return max(ranked, key=lambda item: (item[2], -item[0]))[1]
+
+    def _closed_form_guess_value(
+        self,
+        state: DecisionState,
+        guess: str,
+        candidate_guesses: Sequence[str],
+    ) -> Optional[PlannerValue]:
+        if not self._enabled("closed_forms"):
+            return None
+        mass = dict(self._mass_table(state.belief))
+        if state.remaining_guesses == 1:
+            return (mass.get(guess, 0.0), 1.0)
+        if len(mass) == 1:
+            target = next(iter(mass))
+            if guess == target:
+                return (1.0, 1.0)
+            if target in candidate_guesses:
+                return (1.0, 2.0)
+            return (0.0, 1.0)
+        if len(mass) == 2 and guess in mass and all(
+            target in candidate_guesses for target in mass
+        ):
+            return (1.0, 2.0 - mass[guess])
+        return None
+
+    def _ordered_actions(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+    ) -> Tuple[str, ...]:
+        legal = tuple(candidate_guesses)
+        if not self._enabled("action_ordering"):
+            return legal
+        mass = dict(self._mass_table(state.belief))
+        candidates = sorted(
+            (guess for guess in legal if guess in mass),
+            key=lambda guess: (-mass[guess], guess),
+        )
+        probes = sorted(guess for guess in legal if guess not in mass)
+        return tuple(candidates + probes)
+
+    def _can_use_matrix(
+        self,
+        belief: BeliefState,
+        guess: str,
+        feedback_engine: FeedbackEngine,
+    ) -> bool:
+        if not self._enabled("matrix_transitions") or self.feedback_matrix is None:
+            return False
+        if type(feedback_engine) is not HardleFeedbackEngine:
+            return False
+        if feedback_engine.game_spec.word_length != self.feedback_matrix.word_length:
+            return False
+        mass_table = self._mass_table(belief)
+        return guess in self.feedback_matrix._guess_indices and self.feedback_matrix.contains_answers(
+            tuple(word for word, _ in mass_table)
+        )
+
+    def _transition_branches(
+        self,
+        state: DecisionState,
+        guess: str,
+        mass_table: Tuple[Tuple[str, float], ...],
+        feedback_engine: FeedbackEngine,
+    ) -> Tuple[Tuple[Feedback, float, Tuple[Tuple[str, float], ...]], ...]:
+        if self._can_use_matrix(state.belief, guess, feedback_engine):
+            assert self.feedback_matrix is not None
+            self.stats["matrix_transition_calls"] += 1
+            words = tuple(word for word, _ in mass_table)
+            indices = self.feedback_matrix.answer_indices(words)
+            values = self.feedback_matrix.row_for(guess)[indices]
+            grouped: Dict[int, list[Tuple[str, float]]] = {}
+            for (word, mass), code in zip(mass_table, values):
+                grouped.setdefault(int(code), []).append((word, mass))
+            branches = [
+                (
+                    self.feedback_matrix.decode_code(code),
+                    math.fsum(mass for _, mass in members),
+                    tuple(members),
+                )
+                for code, members in grouped.items()
+            ]
+        else:
+            grouped_scalar: Dict[Feedback, list[Tuple[str, float]]] = {}
+            for target, mass in mass_table:
+                self.stats["scalar_feedback_evaluations"] += 1
+                outcome = tuple(feedback_engine.evaluate(guess, target))
+                grouped_scalar.setdefault(outcome, []).append((target, mass))
+            branches = [
+                (outcome, math.fsum(mass for _, mass in members), tuple(members))
+                for outcome, members in grouped_scalar.items()
+            ]
+        if self._enabled("branch_ordering"):
+            branches.sort(key=lambda item: (-item[1], item[0]))
+        return tuple(branches)
+
+    @staticmethod
+    def _posterior_for_branch(
+        belief: BeliefState,
+        guess: str,
+        outcome: Feedback,
+        members: Tuple[Tuple[str, float], ...],
+        posterior_updater: PosteriorUpdater,
+        use_matrix: bool,
+    ) -> BeliefState:
+        if not use_matrix:
+            return posterior_updater.update(belief, guess, outcome)
+        probability = math.fsum(mass for _, mass in members)
+        normalized = tuple(
+            (target, mass / probability) for target, mass in members
+        )
+        return BeliefState(
+            candidates=tuple(target for target, _ in normalized),
+            observations=belief.observations + ((guess, outcome),),
+            probability_mass=normalized,
+        )
+
+
+class ExactBayesOptimalReferencePlanner(ExactBayesOptimalPlanner):
+    """Scalar exhaustive planner retained as the exact regression oracle."""
+
+    def __init__(self, cache: Optional[PlannerCache] = None) -> None:
+        super().__init__(cache=cache, optimization_layers=())

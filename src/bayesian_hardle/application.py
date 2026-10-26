@@ -246,9 +246,17 @@ def make_solver_context(
         policy = RandomPolicy(seed=seed)
         updater = ExactPosteriorUpdater(feedback)
     elif policy_name == EXACT_POLICY_NAME:
-        updater = ExactPosteriorUpdater(feedback)
+        if use_cache:
+            matrix = ExactFeedbackCodeMatrix.load_or_build(
+                legal,
+                mode.support,
+                cache_dir=cache_dir,
+            )
+        else:
+            matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, mode.support)
+        updater = MatrixPosteriorUpdater(matrix)
         policy = PlannerPolicyAdapter(
-            ExactBayesOptimalPlanner(),
+            ExactBayesOptimalPlanner(feedback_matrix=matrix),
             feedback,
             updater,
         )

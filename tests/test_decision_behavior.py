@@ -11,11 +11,13 @@ from bayesian_hardle.belief import ExactPosteriorUpdater, UniformPrior  # noqa: 
 from bayesian_hardle.decision import (  # noqa: E402
     DecisionState,
     ExactBayesOptimalPlanner,
+    ExactBayesOptimalReferencePlanner,
     MAPPolicy,
     MaxInformationGainPolicy,
     RandomPolicy,
 )
 from bayesian_hardle.game import HardleFeedbackEngine  # noqa: E402
+from bayesian_hardle.accelerated import ExactFeedbackCodeMatrix  # noqa: E402
 
 
 class ConstantInformationGainCalculator:
@@ -156,6 +158,183 @@ class DecisionBehaviorTests(unittest.TestCase):
                 state, ("adieu", "cigar"), self.feedback, self.updater
             ),
             "cigar",
+        )
+
+    def test_closed_forms_have_their_proved_lexicographic_values(self):
+        singleton = DecisionState(
+            UniformPrior().initial_belief(("cigar",)),
+            remaining_guesses=3,
+        )
+        planner = ExactBayesOptimalPlanner(optimization_layers=("closed_forms",))
+        self.assertEqual(
+            planner.select_guess(
+                singleton,
+                ("adieu", "cigar"),
+                self.feedback,
+                self.updater,
+            ),
+            "cigar",
+        )
+        self.assertEqual(
+            planner._guess_value(
+                singleton,
+                "cigar",
+                ("adieu", "cigar"),
+                self.feedback,
+                self.updater,
+            ),
+            (1.0, 1.0),
+        )
+
+        last_horizon_belief = singleton.belief.__class__(
+            candidates=("cigar", "rebut"),
+            probability_mass=(("cigar", 0.2), ("rebut", 0.8)),
+        )
+        last_horizon = DecisionState(last_horizon_belief, remaining_guesses=1)
+        self.assertEqual(
+            planner.select_guess(
+                last_horizon,
+                ("adieu", "cigar", "rebut"),
+                self.feedback,
+                self.updater,
+            ),
+            "rebut",
+        )
+        self.assertEqual(
+            planner._guess_value(
+                last_horizon,
+                "rebut",
+                ("adieu", "cigar", "rebut"),
+                self.feedback,
+                self.updater,
+            ),
+            (0.8, 1.0),
+        )
+
+        two_candidates = DecisionState(last_horizon_belief, remaining_guesses=2)
+        self.assertEqual(
+            planner.select_guess(
+                two_candidates,
+                ("adieu", "cigar", "rebut"),
+                self.feedback,
+                self.updater,
+            ),
+            "rebut",
+        )
+        self.assertEqual(
+            planner._guess_value(
+                two_candidates,
+                "rebut",
+                ("adieu", "cigar", "rebut"),
+                self.feedback,
+                self.updater,
+            ),
+            (1.0, 1.2),
+        )
+
+    def test_canonical_key_normalizes_mass_and_ignores_history(self):
+        first = self.state.belief.__class__(
+            candidates=("cigar", "rebut", "sissy"),
+            observations=(("adieu", (0, 0)),),
+            probability_mass=(("cigar", 2.0), ("rebut", 3.0), ("sissy", 5.0)),
+        )
+        second = self.state.belief.__class__(
+            candidates=("sissy", "cigar", "rebut"),
+            observations=(("arise", (1, 0)),),
+            probability_mass=(("sissy", 0.5), ("cigar", 0.2), ("rebut", 0.3)),
+        )
+        first_key = ExactBayesOptimalPlanner._canonical_key(
+            DecisionState(first, 2), ("rebut", "adieu", "cigar")
+        )
+        second_key = ExactBayesOptimalPlanner._canonical_key(
+            DecisionState(second, 2), ("cigar", "rebut", "adieu")
+        )
+        self.assertEqual(first_key, second_key)
+
+    def test_reference_and_optimized_planners_match_on_deterministic_random_states(self):
+        rng = random.Random(20261025)
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        for _ in range(24):
+            selected = tuple(sorted(rng.sample(support, rng.randint(1, len(support)))))
+            raw = [rng.randint(1, 9) for _ in selected]
+            total = float(sum(raw))
+            belief = self.state.belief.__class__(
+                candidates=selected,
+                probability_mass=tuple(
+                    (word, value / total) for word, value in zip(selected, raw)
+                ),
+            )
+            state = DecisionState(belief, rng.randint(1, 3))
+            reference = ExactBayesOptimalReferencePlanner()
+            optimized = ExactBayesOptimalPlanner(feedback_matrix=matrix)
+            reference_guess = reference.select_guess(
+                state, legal, self.feedback, self.updater
+            )
+            optimized_guess = optimized.select_guess(
+                state, legal, self.feedback, self.updater
+            )
+            reference_value = reference._guess_value(
+                state, reference_guess, legal, self.feedback, self.updater
+            )
+            optimized_value = optimized._guess_value(
+                state, optimized_guess, legal, self.feedback, self.updater
+            )
+            self.assertEqual(optimized_guess, reference_guess)
+            self.assertIsNotNone(reference_value)
+            self.assertIsNotNone(optimized_value)
+            self.assertAlmostEqual(optimized_value[0], reference_value[0])
+            self.assertAlmostEqual(optimized_value[1], reference_value[1])
+
+    def test_branch_and_bound_prunes_only_noncompetitive_actions(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        belief = UniformPrior().initial_belief(support)
+        state = DecisionState(belief, 3)
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        reference = ExactBayesOptimalReferencePlanner()
+        optimized = ExactBayesOptimalPlanner(feedback_matrix=matrix)
+        reference_guess = reference.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        optimized_guess = optimized.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        self.assertEqual(optimized_guess, reference_guess)
+        reference_value = reference._guess_value(
+            state, reference_guess, legal, self.feedback, self.updater
+        )
+        optimized_value = optimized._guess_value(
+            state, optimized_guess, legal, self.feedback, self.updater
+        )
+        self.assertEqual(optimized_value, reference_value)
+        self.assertGreater(optimized.stats["actions_pruned"], 0)
+        self.assertLess(
+            optimized.stats["actions_completed"],
+            optimized.stats["actions_evaluated"],
         )
 
 
