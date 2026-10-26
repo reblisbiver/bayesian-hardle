@@ -1,0 +1,36 @@
+         67404 function calls (66712 primitive calls) in 0.009 seconds
+
+   Ordered by: cumulative time
+   List reduced from 57 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.009    0.009 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:446(select_guess)
+    207/1    0.000    0.000    0.009    0.009 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:473(_best_guess)
+   497/11    0.001    0.000    0.009    0.001 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:554(_guess_value)
+     1132    0.001    0.000    0.005    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/game.py:118(evaluate)
+      206    0.000    0.000    0.003    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:976(_posterior_for_branch)
+      206    0.000    0.000    0.003    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:135(update)
+      290    0.001    0.000    0.003    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:919(_transition_branches)
+      206    0.000    0.000    0.002    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:143(<listcomp>)
+     1338    0.000    0.000    0.001    0.000 {built-in method builtins.sum}
+     2264    0.001    0.000    0.001    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/game.py:13(_normalise_word)
+     5718    0.001    0.000    0.001    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/game.py:130(<genexpr>)
+      206    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:23(__post_init__)
+      704    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:413(_canonical_key)
+    15467    0.000    0.000    0.000    0.000 {method 'get' of 'dict' objects}
+      290    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:434(_mass_table)
+      999    0.000    0.000    0.000    0.000 {built-in method math.fsum}
+     4586    0.000    0.000    0.000    0.000 {built-in method builtins.min}
+      496    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:42(total_mass)
+      704    0.000    0.000    0.000    0.000 {built-in method builtins.sorted}
+      290    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:958(<listcomp>)
+      206    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:123(_mass_table)
+     4413    0.000    0.000    0.000    0.000 {built-in method builtins.len}
+     1808    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:430(<genexpr>)
+     2245    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:387(_enabled)
+     2264    0.000    0.000    0.000    0.000 {method 'lower' of 'str' objects}
+      261    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/decision.py:660(_value_is_better)
+      206    0.000    0.000    0.000    0.000 {built-in method builtins.any}
+     2264    0.000    0.000    0.000    0.000 {method 'isalpha' of 'str' objects}
+     2264    0.000    0.000    0.000    0.000 {method 'strip' of 'str' objects}
+     1628    0.000    0.000    0.000    0.000 /Users/darwin/代码/bayesian-hardle/.worktrees/issue-011-exact-planner-hotspots/src/bayesian_hardle/belief.py:44(<genexpr>)
