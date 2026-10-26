@@ -682,3 +682,15 @@ Evidence paths:
 
 Remaining boundary:
 - Results are executor-local and machine-specific, pending independent supervisor review. No research definition, objective, hypothesis space, feedback semantics, or live/business acceptance claim was changed.
+
+## 2026-10-25 — [SUPERVISOR REVIEW] ISSUE-005 exact Max-IG performance — accepted
+
+Status: ACCEPTED
+
+Independent post-merge verification passed 44/44 tests. The exact accelerated path preserves the accepted feedback and Max-IG semantics while replacing repeated Python-level guess×answer evaluation with an exact uint8 feedback matrix, vectorized outcome scoring, and deterministic state caching. Fresh evidence: cold full first move ~0.61s, warm full first move ~0.12s, and the 2,315-target exact Max-IG benchmark completed 2,315/2,315 with solve rate 1.0, mean guesses 4.586177, runtime ~18.41s.
+
+## 2026-10-25 — [OWNER DECISION] Fair full-support benchmark and interactive acceptance
+
+Status: DIRECTIVE
+
+The OWNER rejects the curated 2,315-answer subset as the primary fairness assumption for human-comparison claims because a real player is not assumed to know that hidden subset. Primary fair hypothesis support must therefore cover all 12,974 current legal Hardle words. Keep the 2,315 mode only as a diagnostic/answer-list-aware comparison. Build both full-uniform and broad general-English-frequency non-leaking prior modes, with non-zero support for every legal word. Also provide a local interactive acceptance client so the OWNER can enter a target word or manually feed live Hardle feedback and inspect step-by-step guesses, remaining candidates, probabilities/information, and compute time under selectable policies.

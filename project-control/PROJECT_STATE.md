@@ -13,7 +13,7 @@ How do exact Bayesian baselines behave on Hardle, and where do exact information
 
 ## Current milestone
 
-ISSUE-004 exact Bayesian core and first controlled experiment accepted. The next engineering milestone is scaling the exact Max-IG path so it can complete meaningful full-vocabulary evaluation without changing the research definition.
+ISSUE-005 exact Max-IG acceleration accepted. The next milestone is a fairness-oriented evaluation mode in which the solver does not know the curated answer subset, together with an interactive local acceptance interface the OWNER can use directly.
 
 ## Confirmed decisions
 
@@ -21,11 +21,12 @@ ISSUE-004 exact Bayesian core and first controlled experiment accepted. The next
 - OWNER is not used as a message relay between SUPERVISOR and EXECUTOR.
 - Executor reports are not accepted state until independent SUPERVISOR review.
 - Bayesian core work must precede neural-network or reinforcement-learning work.
-- Legal guesses and candidate answers are separate vocabularies.
-- Solver candidate-answer space is the non-leaking 2,315-word curated answer vocabulary; scheduled Hardle answer membership is not solver knowledge.
+- Legal guesses and candidate answers remain conceptually separate, but the primary fairness benchmark must not assume knowledge of the curated 2,315-word answer subset.
+- Primary fair hypothesis support is the full current Hardle legal vocabulary (12,974 words): every legal word remains possible. The curated 2,315-word list is retained only as a diagnostic/answer-list-aware comparison mode.
+- Fair modes must not use scheduled Hardle answer membership. A full-uniform prior and a broad general-English-frequency prior may be compared, provided every legal word retains non-zero support and the prior uses no future/scheduled answer leakage.
 - Hardle feedback is `(exact-position count, present-but-wrong-position count)` with duplicate-aware multiplicity matching.
 - Maximum guesses for the current full benchmark is 10.
-- First-baseline prior is uniform over candidate answers.
+- ISSUE-004's original 2,315-answer baseline used a uniform prior; future fair benchmarks will compare full-uniform and full-frequency priors over the full legal support.
 - Primary objective is final solve probability within the finite horizon; expected guesses is a secondary tie-break only when solve probability is equal.
 
 ## Hard constraints
@@ -46,6 +47,7 @@ Max-IG maximizes exact information gain first; ties within numerical tolerance p
 - ISSUE-001 project control plane and repository scaffold.
 - ISSUE-003 five-group Bayesian Hardle component/interface scaffold.
 - ISSUE-004 exact Hardle feedback, Bayesian posterior, entropy/information gain, Random/MAP/Max-IG baselines, exact small-vocabulary Bayes-optimal planner, evaluation runner, pinned word-list inputs, and reproducible experiment artifacts.
+- ISSUE-005 exact Max-IG acceleration using an exact uint8 feedback matrix, vectorized outcome scoring, and deterministic decision caching while preserving scalar reference semantics.
 
 ## Accepted experiments
 
@@ -57,13 +59,13 @@ First controlled ISSUE-004 experiment:
 
 ## Active issue
 
-Scale exact Max-IG computation and then run a meaningful full-vocabulary Max-IG comparison. Exact full-vocabulary Bayes-optimal planning remains intentionally out of scope until tractability is reassessed.
+Build the fairness-oriented full-support benchmark and an interactive local acceptance client. Exact full-vocabulary Bayes-optimal planning remains intentionally out of scope until tractability is reassessed.
 
 ## Open questions
 
-- What exact computational optimizations are sufficient to make full Max-IG practical without changing its mathematical definition?
-- After exact Max-IG is scaled, how does its solve-rate / guess-efficiency profile compare with MAP on the full benchmark?
-- At what vocabulary/horizon size does exact finite-horizon Bayes-optimal planning cease to be practical, and what approximations should be studied only after that boundary is measured?
+- How much performance changes when the solver must treat all 12,974 legal words as possible hidden answers rather than knowing the curated 2,315 subset.
+- How full-uniform and general-English-frequency priors compare under the same non-leaking full support.
+- How Max-IG, MAP, and later finite-horizon methods behave when evaluated through the same interactive and reproducible acceptance client.
 
 ## Deferred ideas
 
@@ -75,4 +77,4 @@ None recorded.
 
 ## Current verified implementation checkpoint
 
-ISSUE-004 correction checkpoint `9568d1b` on `codex/issue-004-exact-bayesian-core`, independently verified by SUPERVISOR with 35 passing tests, compile/import checks, `git diff --check`, clean worktree, regenerated experiment artifacts, and independent policy traces confirming the Max-IG and Bayes-optimal tie-handling fixes.
+ISSUE-005 checkpoint `fe4f035` on `codex/issue-005-maxig-speed`, independently verified by SUPERVISOR after merge with 44 passing tests. Exact Max-IG cold first move is ~0.61s, warm full first move ~0.12s, and the 2,315-target benchmark completes in ~18.4s with 100% solve rate and mean 4.586 guesses.
