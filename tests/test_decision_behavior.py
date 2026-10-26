@@ -416,6 +416,47 @@ class DecisionBehaviorTests(unittest.TestCase):
                 reference.select_guess(state, legal, self.feedback, self.updater),
             )
 
+    def test_horizon_two_capacity_root_bound_dominates_exact_child_value(self):
+        support = ("allee", "eagle", "llama", "belle", "civic")
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        weighted = self.state.belief.__class__(
+            candidates=support,
+            probability_mass=(
+                ("allee", 0.07),
+                ("eagle", 0.19),
+                ("llama", 0.23),
+                ("belle", 0.31),
+                ("civic", 0.20),
+            ),
+        )
+        root_state = DecisionState(weighted, remaining_guesses=3)
+        planner = ExactBayesOptimalPlanner(feedback_matrix=matrix)
+        branches = planner._transition_branches(
+            root_state,
+            "arise",
+            tuple(weighted.probability_mass),
+            self.feedback,
+            use_matrix=True,
+        )
+        exact_success = 0.0
+        upper_success = 0.0
+        for outcome, probability, members in branches:
+            if outcome == (5, 0):
+                exact_success += probability
+                upper_success += probability
+                continue
+            words = tuple(word for word, _ in members)
+            child_weights = tuple(mass / probability for _, mass in members)
+            child_values = matrix.horizon_two_values(
+                legal, words, child_weights, legal
+            )
+            exact_success += probability * max(value[0] for value in child_values)
+            upper_success += probability * matrix.horizon_two_capacity_upper_bound(
+                words, child_weights, legal
+            )
+        self.assertGreaterEqual(upper_success + 1e-12, exact_success)
+
     def test_horizon_two_matrix_batch_matches_scalar_and_reference_with_duplicates(self):
         support = ("awake", "cigar", "humph", "rebut", "sissy")
         legal = (

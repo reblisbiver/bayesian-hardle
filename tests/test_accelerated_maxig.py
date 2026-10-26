@@ -288,6 +288,42 @@ class AcceleratedMaxIGTests(unittest.TestCase):
             expected = reference.calculate(belief, guess, distribution)
             self.assertAlmostEqual(float(batch[index]), expected, delta=1e-12)
 
+    def test_horizon_two_capacity_bounds_dominate_weighted_exact_values(self):
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        answers = ("allee", "eagle", "llama", "belle", "civic")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, answers)
+        weights = (0.07, 0.19, 0.23, 0.31, 0.20)
+        exact = matrix.horizon_two_values(legal, answers, weights, legal)
+
+        capacity = matrix.horizon_two_capacity_upper_bound(
+            answers, weights, legal
+        )
+        self.assertLessEqual(max(value[0] for value in exact), capacity + 1e-12)
+        for guess, value in zip(legal, exact):
+            action_bound = matrix.horizon_two_action_capacity_upper_bound(
+                guess, answers, weights, legal
+            )
+            self.assertLessEqual(value[0], action_bound + 1e-12)
+
+    def test_horizon_two_capacity_bound_respects_legal_final_answer_boundary(self):
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        answers = ("allee", "eagle", "llama", "belle", "civic")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, answers)
+        weights = (0.07, 0.19, 0.23, 0.31, 0.20)
+        exact = matrix.horizon_two_values(
+            legal, answers, weights, ("allee", "eagle")
+        )
+
+        capacity = matrix.horizon_two_capacity_upper_bound(
+            answers, weights, ("allee", "eagle")
+        )
+        self.assertAlmostEqual(capacity, 0.26)
+        for guess, value in zip(legal, exact):
+            action_bound = matrix.horizon_two_action_capacity_upper_bound(
+                guess, answers, weights, ("allee", "eagle")
+            )
+            self.assertLessEqual(value[0], action_bound + 1e-12)
+
 
 if __name__ == "__main__":
     unittest.main()

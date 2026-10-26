@@ -357,6 +357,92 @@ class ExactFeedbackCodeMatrix:
             for index in range(len(guesses))
         )
 
+    def _validated_horizon_two_weights(
+        self,
+        answer_words: Sequence[str],
+        weights: Sequence[float],
+    ) -> Tuple[Tuple[str, ...], np.ndarray]:
+        words = tuple(answer_words)
+        if not words:
+            raise ValueError("answer_words cannot be empty")
+        if len(words) != len(weights):
+            raise ValueError("weights must match answer_words")
+        if any(answer not in self._answer_indices for answer in words):
+            raise ValueError("all answer_words must be in the feedback matrix")
+        values = np.asarray(tuple(float(weight) for weight in weights), dtype=np.float64)
+        if np.any(~np.isfinite(values)) or np.any(values < 0):
+            raise ValueError("weights must be finite and non-negative")
+        return words, values
+
+    def horizon_two_capacity_upper_bound(
+        self,
+        answer_words: Sequence[str],
+        weights: Sequence[float],
+        legal_final_answers: Sequence[str],
+    ) -> float:
+        """Return a safe top-mass upper bound for every exact H2 probe.
+
+        A Hardle probe has at most ``code_count`` feedback codes, and a final
+        legal answer can collect credit from at most one answer in each code
+        bucket.  Therefore the exact H2 success probability, which is the
+        sum of the largest eligible mass in every bucket, cannot exceed the
+        sum of the largest ``code_count`` legal-answer masses overall.  The
+        argument uses only non-negative posterior masses and does not assume
+        anything about the probe's partition, so it is an upper bound for
+        every legal probe.  The caller is responsible for supplying the same
+        normalized weights contract as ``horizon_two_values``.
+        """
+
+        words, values = self._validated_horizon_two_weights(answer_words, weights)
+        legal_final = set(legal_final_answers)
+        eligible = sorted(
+            (float(weight) for word, weight in zip(words, values) if word in legal_final),
+            reverse=True,
+        )
+        return float(math.fsum(eligible[: self.code_count]))
+
+    def horizon_two_action_capacity_upper_bound(
+        self,
+        first_guess: str,
+        answer_words: Sequence[str],
+        weights: Sequence[float],
+        legal_final_answers: Sequence[str],
+    ) -> float:
+        """Return the safe capacity bound for one specified H2 probe.
+
+        When ``first_guess`` is itself a legal answer in the posterior, its
+        exact-win code consumes one of the finite code slots.  Its mass is
+        counted exactly and only the largest ``code_count - 1`` remaining
+        legal-answer masses are added.  A non-answer probe uses the global
+        capacity bound because it has no guaranteed exact-win slot.
+        """
+
+        if first_guess not in self._guess_indices:
+            raise ValueError("first_guess must be in the feedback matrix")
+        words, values = self._validated_horizon_two_weights(answer_words, weights)
+        legal_final = set(legal_final_answers)
+        eligible = {
+            word: float(weight)
+            for word, weight in zip(words, values)
+            if word in legal_final
+        }
+        if first_guess not in eligible:
+            return float(
+                math.fsum(sorted(eligible.values(), reverse=True)[: self.code_count])
+            )
+        remaining = sorted(
+            (
+                weight
+                for word, weight in eligible.items()
+                if word != first_guess
+            ),
+            reverse=True,
+        )
+        return float(
+            eligible[first_guess]
+            + math.fsum(remaining[: max(0, self.code_count - 1)])
+        )
+
     def code_for(self, guess: str, answer: str) -> int:
         return int(self._codes[self.guess_index(guess), self.answer_index(answer)])
 
