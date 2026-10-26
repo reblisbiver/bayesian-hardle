@@ -77,6 +77,28 @@ class ApplicationSessionTests(unittest.TestCase):
                 use_cache=False,
             )
 
+    def test_new_battle_samples_from_selected_support_with_injected_rng(self):
+        class RecordingRng:
+            def __init__(self):
+                self.values = None
+
+            def choice(self, values):
+                self.values = tuple(values)
+                return values[-1]
+
+        rng = RecordingRng()
+        battle = BattleSession(
+            mode_name="full-uniform",
+            policy_name="map",
+            repository_root=self.root,
+            use_cache=False,
+            rng=rng,
+        )
+
+        self.assertEqual(len(rng.values), 6)
+        outcome = battle.give_up()
+        self.assertEqual(outcome.target, rng.values[-1])
+
     def test_battle_returns_only_human_feedback_before_finish(self):
         battle = BattleSession(
             mode_name="full-uniform",
