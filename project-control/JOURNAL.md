@@ -835,3 +835,36 @@ Known boundary:
 - No exact Bayes-optimal implementation or approximation was added; the policy remains unavailable for full-support GUI execution.
 - AppTest and local Streamlit startup are local behavioral evidence, not physical-browser, remote, business, or supervisor acceptance.
 - A pre-existing untracked `uv.lock` was present before ISSUE-008 work began and was intentionally not modified or included in the implementation commit. The tracked source diff is clean at `a7cd73f`, but the worktree still reports that unrelated untracked file.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-009 small-vocabulary Exact GUI experiment
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-009`
+Branch: `codex/issue-009-small-exact-gui`
+Worktree: `.worktrees/issue-009-small-exact-gui`
+Base SHA: `03f98c4e3d4e7d59e3691cfac48bb3c1e7feb737` (ISSUE-008 handoff checkpoint)
+Implementation commit: `94cae4ee04bb7114c4640f344449301cd4fdcd9d` (`feat: expose exact planner in small GUI scope`)
+
+What changed:
+- Added the top-level Chinese `实验范围` selector with `全词表（公平主实验）` and `小词表（Exact 实验）`.
+- Preserved all three full-table modes and their Random / MAP / Max-IG runnable policies. Exact is visible in the full comparison page as unavailable with the explanation `仅小词表精确实验可用`; the shared application service rejects a full-scope Exact request before constructing a full-support solver.
+- Added the deterministic ISSUE-004 small fixture: five candidate targets (`awake`, `cigar`, `humph`, `rebut`, `sissy`), eight declared legal guesses plus repository Hardle additions (`covid`, `padel`) for ten actual legal guesses, and a three-guess horizon.
+- Connected the existing `ExactBayesOptimalPlanner` through the existing `PlannerPolicyAdapter`, `HardleFeedbackEngine`, and exact posterior updater. The small comparison service exposes Random / MAP / Max-IG / Exact together and renders side-by-side per-turn tables with guess, feedback, remaining candidates, decision time, cumulative time, status, and total turns.
+- Kept the battle page on scalable policies and explicitly directs Exact comparison to the small-table comparison page. Added Chinese target-support validation and updated README usage instructions.
+- Kept `project-control/PROJECT_STATE.md` unchanged; only this append-only journal received a new entry.
+
+Fresh verification evidence:
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . python -m unittest discover -s tests -v` — `77/77` passed.
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . python -m unittest tests.test_streamlit_smoke -v` — `10/10` passed, including Chinese scope labels, four-policy small scope, full-scope Exact unavailability, target validation, and battle redaction.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue009-pycache python3 -m compileall -q src tests experiments` — passed.
+- uv-environment package and Streamlit imports — `compile_import=ok`.
+- `git diff --check` — passed.
+- Small application-service verification: actual support count `5`, actual legal-guess count `10`; Exact solved all five accepted targets in two turns, selected `arise` first for each, and MAP / Max-IG / Random ran through the same public service.
+- Full-scope application verification: requesting Exact raised `Exact Bayes-optimal is only available in the small vocabulary experiment` before a full-support solver was built.
+- Real server smoke: `UV_CACHE_DIR=/tmp/bayesian-hardle-uv-cache uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py --server.headless true --server.port 8505` started on `http://localhost:8505`; authorized HTTP readback returned `<title>Streamlit`; the temporary server was stopped with Ctrl-C.
+- `project-control/PROJECT_STATE.md` SHA-256 remained `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+Known boundary:
+- AppTest and local server startup/readback are local behavioral evidence, not physical-browser, remote, business, or supervisor acceptance.
+- The worktree does not claim supervisor acceptance; the next state transition requires an independent `[SUPERVISOR REVIEW]`.
