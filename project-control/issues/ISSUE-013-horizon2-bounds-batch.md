@@ -11,7 +11,7 @@ required. `project-control/PROJECT_STATE.md` is unchanged.
 - Worktree: `/private/tmp/bayesian-hardle-issue-013`
 - Base: `34d4e58fdf940c40ca8a6a1f134e8a1125c573ae`
   (`codex/issue-012-horizon3-root-audit`)
-- Implementation checkpoints: `f6428bc`, `465b240`, `93c57a6`, `aa59c10`
+- Implementation checkpoints: `f6428bc`, `465b240`, `93c57a6`, `aa59c10`, `7fab431`
 - `PROJECT_STATE.md` SHA-256 before and after: `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`
 - Canonical checkout was not modified.
 
@@ -82,12 +82,13 @@ full 2315/horizon-3 feasibility claim is made.
 
 ## Verification
 
-- Fresh full suite: `92` passed, `9` skipped.
+- Fresh final full suite: `93` passed, `9` skipped.
 - `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue013-task4-compile-pycache python3 -m compileall -q src tests experiments` — passed.
 - Artifact validator — passed: `14` completed rows, `2` bounded curated timeouts.
 - Completed control/fused equivalence validator — passed: `7` pairs, selected guesses and values equal within `1e-12`.
 - `git diff --check` — passed before the handoff edit.
-- Package import/version check and final boundary checks remain to be rerun after this handoff commit.
+- Package import/version (`0.1.0`) and final boundary checks — passed after
+  checkpoint `7fab431`.
 
 ## Remaining boundary
 
