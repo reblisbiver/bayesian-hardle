@@ -131,3 +131,19 @@ project dependencies:
 ```bash
 PYTHONPATH=src python3 experiments/issue_006_fair_client.py
 ```
+
+## Interactive browser acceptance (ISSUE-007)
+
+Launch the local visual acceptance client from this repository with uv:
+
+```bash
+uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py
+```
+
+Open the local URL Streamlit prints. The **Strategy comparison** tab runs MAP,
+Max-IG, and optional Random independently against the same known target and
+shows one readable table per policy. The **Human vs Solver** tab samples a
+hidden target uniformly from the selected support, returns only human feedback
+while you play, and reveals the target plus the solver's full trajectory only
+after a solve, the ten-guess horizon, or Give up. `curated-2315` is explicitly
+diagnostic / answer-list-aware; it is not the primary fairness mode.
