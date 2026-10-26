@@ -476,6 +476,40 @@ class DecisionBehaviorTests(unittest.TestCase):
             )
         self.assertGreater(batch.stats["horizon_two_batch_calls"], 0)
 
+    def test_matrix_eligibility_is_checked_once_per_transition(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        planner = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            optimization_layers=(
+                "closed_forms",
+                "matrix_transitions",
+                "canonical_memoization",
+                "action_ordering",
+                "branch_ordering",
+                "branch_and_bound",
+            ),
+        )
+        planner.select_guess(self.state, legal, self.feedback, self.updater)
+
+        self.assertGreater(planner.stats["matrix_transition_calls"], 0)
+        self.assertEqual(
+            planner.stats["matrix_eligibility_checks"],
+            planner.stats["matrix_transition_calls"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
