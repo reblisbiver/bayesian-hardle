@@ -331,8 +331,10 @@ class ExactBayesOptimalPlanner:
         "horizon_two_batch",
         "horizon_two_child_batch",
         "root_horizon_two_ordering",
+        "uniform_h3_branch_capacity",
     )
     HORIZON_TWO_CHILD_BATCH_SIZE = 2
+    UNIFORM_H3_CODE_COUNT = 36
 
     _STAT_KEYS = (
         "states_evaluated",
@@ -365,6 +367,12 @@ class ExactBayesOptimalPlanner:
         "root_order_proxy_calls",
         "root_order_proxy_actions",
         "root_order_proxy_matrix_cells",
+        "root_actions_started",
+        "root_actions_completed",
+        "root_actions_pruned",
+        "uniform_h3_capacity_initializations",
+        "uniform_h3_capacity_pruned_actions",
+        "uniform_h3_capacity_pruned_before_first_child",
     )
 
     def __init__(
@@ -471,6 +479,10 @@ class ExactBayesOptimalPlanner:
             "prune_after_branch_index": None,
             "prune_upper_success": None,
             "prune_lower_expected": None,
+            "uniform_h3_capacity_bound_used": False,
+            "uniform_h3_capacity_units_initial": None,
+            "uniform_h3_capacity_units_remaining": None,
+            "uniform_h3_capacity_pruned_before_first_child": False,
             "incumbent_after": None,
         }
 
@@ -554,6 +566,53 @@ class ExactBayesOptimalPlanner:
         self._state_support_histogram[support_key] = (
             self._state_support_histogram.get(support_key, 0) + 1
         )
+
+    @classmethod
+    def _uniform_h3_capacity_units(
+        cls,
+        branches: Sequence[
+            Tuple[Feedback, float, Tuple[Tuple[str, float], ...]]
+        ],
+        word_length: int,
+    ) -> Tuple[int, ...]:
+        """Return root-success capacity numerators for uniform H3 branches.
+
+        The caller divides the sum of these integer units by the uniform root
+        support size ``N``.  A winning branch is exact at one answer, while a
+        non-winning H2 child can certify at most one answer per feedback code.
+        Keeping the units integral makes the O(1) branch decrement exact;
+        ``word_length`` is explicit so tests can exercise the winning marker
+        without constructing a feedback engine.
+        """
+
+        code_count = cls.UNIFORM_H3_CODE_COUNT
+        return tuple(
+            1
+            if outcome == (word_length, 0)
+            else min(code_count, len(members))
+            for outcome, _, members in branches
+        )
+
+    @classmethod
+    def _uniform_h3_capacity_eligible(
+        cls,
+        state: DecisionState,
+        mass_table: Tuple[Tuple[str, float], ...],
+        feedback_engine: FeedbackEngine,
+    ) -> bool:
+        """Return whether the exact uniform-H3 branch bound may be used."""
+
+        if (
+            state.remaining_guesses != 3
+            or type(feedback_engine) is not HardleFeedbackEngine
+            or feedback_engine.game_spec.word_length != 5
+            or not mass_table
+        ):
+            return False
+        uniform_mass = 1.0 / len(mass_table)
+        # Use strict equality.  Treating merely near-uniform weights as
+        # uniform could make the capacity bound unsound for weighted beliefs.
+        return all(mass == uniform_mass for _, mass in mass_table)
 
     def select_guess(
         self,
@@ -648,6 +707,7 @@ class ExactBayesOptimalPlanner:
         for guess in ordered:
             if is_root:
                 self._root_actions_seen += 1
+                self.stats["root_actions_started"] += 1
             record = (
                 self._new_root_action_record(guess)
                 if is_root
@@ -691,12 +751,16 @@ class ExactBayesOptimalPlanner:
                     record[key] = self.stats[key] - before
             if value is None:
                 self.stats["actions_pruned"] += 1
+                if is_root:
+                    self.stats["root_actions_pruned"] += 1
                 if record is not None:
                     record["status"] = "pruned"
                     record["pruned"] = True
                     self._root_action_records.append(record)
                 continue
             self.stats["actions_completed"] += 1
+            if is_root:
+                self.stats["root_actions_completed"] += 1
             if incumbent is None or self._value_is_better(
                 value,
                 incumbent,
@@ -809,18 +873,56 @@ class ExactBayesOptimalPlanner:
         expected_guesses = 1.0
         processed_probability = 0.0
 
+        uniform_h3_capacity_units: Optional[Tuple[int, ...]] = None
+        remaining_capacity_units = 0
+        if (
+            self._enabled("uniform_h3_branch_capacity")
+            and self._uniform_h3_capacity_eligible(
+                state, mass_table, feedback_engine
+            )
+        ):
+            uniform_h3_capacity_units = self._uniform_h3_capacity_units(
+                branches, feedback_engine.game_spec.word_length
+            )
+            remaining_capacity_units = sum(uniform_h3_capacity_units)
+            self.stats["uniform_h3_capacity_initializations"] += 1
+            if self._active_root_action is not None:
+                self._active_root_action[
+                    "uniform_h3_capacity_bound_used"
+                ] = True
+                self._active_root_action[
+                    "uniform_h3_capacity_units_initial"
+                ] = remaining_capacity_units
+                self._active_root_action[
+                    "uniform_h3_capacity_units_remaining"
+                ] = remaining_capacity_units
+
         use_child_batch = (
             state.remaining_guesses == 3
             and self._enabled("horizon_two_child_batch")
         )
         pending_children: list[Dict[str, Any]] = []
+        child_h2_work_started = False
 
-        def check_branch_pruning(branch_index: int) -> bool:
+        def check_branch_pruning(
+            branch_index: int, *, before_first_child: bool = False
+        ) -> bool:
             if incumbent is None or not self._enabled("branch_and_bound"):
                 return False
-            upper_success = success_probability + max(
-                0.0, 1.0 - processed_probability
-            )
+            if uniform_h3_capacity_units is not None:
+                upper_success = math.nextafter(
+                    math.fsum(
+                        (
+                            success_probability,
+                            remaining_capacity_units / len(mass_table),
+                        )
+                    ),
+                    math.inf,
+                )
+            else:
+                upper_success = success_probability + max(
+                    0.0, 1.0 - processed_probability
+                )
             prune_started = time.perf_counter()
             cannot_beat = self._cannot_beat_incumbent(
                 upper_success, expected_guesses, incumbent
@@ -830,20 +932,44 @@ class ExactBayesOptimalPlanner:
                     "pruning", time.perf_counter() - prune_started
                 )
             if cannot_beat:
+                if uniform_h3_capacity_units is not None:
+                    self.stats["uniform_h3_capacity_pruned_actions"] += 1
+                    if before_first_child or not child_h2_work_started:
+                        self.stats[
+                            "uniform_h3_capacity_pruned_before_first_child"
+                        ] += 1
                 if self._active_root_action is not None:
                     self._active_root_action["pruned"] = True
                     self._active_root_action["prune_after_branch_index"] = branch_index
                     self._active_root_action["prune_upper_success"] = upper_success
                     self._active_root_action["prune_lower_expected"] = expected_guesses
+                    if (
+                        uniform_h3_capacity_units is not None
+                        and (before_first_child or not child_h2_work_started)
+                    ):
+                        self._active_root_action[
+                            "uniform_h3_capacity_pruned_before_first_child"
+                        ] = True
                 return True
             return False
+
+        def mark_branch_processed(branch_index: int) -> None:
+            nonlocal remaining_capacity_units
+            if uniform_h3_capacity_units is not None:
+                remaining_capacity_units -= uniform_h3_capacity_units[branch_index]
+                if self._active_root_action is not None:
+                    self._active_root_action[
+                        "uniform_h3_capacity_units_remaining"
+                    ] = remaining_capacity_units
 
         def flush_pending_children() -> bool:
             nonlocal success_probability
             nonlocal expected_guesses
             nonlocal processed_probability
+            nonlocal child_h2_work_started
             if not pending_children:
                 return False
+            child_h2_work_started = True
             child_results = self._evaluate_horizon_two_child_block(
                 pending_children,
                 candidate_guesses,
@@ -866,11 +992,17 @@ class ExactBayesOptimalPlanner:
                 success_probability += probability * next_success
                 expected_guesses += probability * next_expected
                 processed_probability += probability
+                mark_branch_processed(branch_index)
                 if check_branch_pruning(branch_index):
                     pending_children.clear()
                     return True
             pending_children.clear()
             return False
+
+        if uniform_h3_capacity_units is not None and check_branch_pruning(
+            -1, before_first_child=True
+        ):
+            return None
 
         for branch_index, (outcome, probability, members) in enumerate(branches):
             self.stats["branches_evaluated"] += 1
@@ -883,6 +1015,7 @@ class ExactBayesOptimalPlanner:
                         self._active_root_action["branches"][branch_index]["processed"] = True
                     success_probability += probability
                     processed_probability += probability
+                    mark_branch_processed(branch_index)
                     if check_branch_pruning(branch_index):
                         return None
                     continue
@@ -980,6 +1113,7 @@ class ExactBayesOptimalPlanner:
                     + self.stats["horizon_two_scalar_calls"]
                 )
                 child_started = time.perf_counter()
+                child_h2_work_started = True
                 next_guess = self._best_guess(
                     next_state,
                     candidate_guesses,
@@ -1015,6 +1149,7 @@ class ExactBayesOptimalPlanner:
                 success_probability += probability * next_success
                 expected_guesses += probability * next_expected
             processed_probability += probability
+            mark_branch_processed(branch_index)
             if check_branch_pruning(branch_index):
                 return None
         if use_child_batch and flush_pending_children():

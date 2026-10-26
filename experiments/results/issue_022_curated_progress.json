@@ -1,0 +1,80 @@
+{
+  "case": "curated2315_h3_fulllegal",
+  "issue": "ISSUE-022",
+  "runs": [
+    {
+      "elapsed_seconds": 44.004818791000005,
+      "legal_size": 12974,
+      "matrix_build_seconds": 0.5512008749999999,
+      "root_summary": {
+        "branches_evaluated": 162,
+        "capacity_initializations": 0,
+        "capacity_pruned_actions": 0,
+        "child_h2_exact_solves": 137,
+        "child_h2_solve_requests": 118,
+        "child_h2_value_calls": 138,
+        "matrix_cells": 335429796,
+        "matrix_memory_bytes": 30034810,
+        "root_actions_completed": 4,
+        "root_actions_pruned": 7,
+        "root_actions_pruned_before_first_child": 0,
+        "root_actions_seen": 12,
+        "root_actions_started": 12,
+        "root_actions_traced": 8,
+        "root_branches_processed": 122,
+        "root_branches_traced": 152,
+        "root_pruning_ratio": 0.5833333333333334,
+        "timing_seconds": {
+          "cache_key": 0.06338679099999589,
+          "child_h2_solve": 31.485786924000013,
+          "pruning": 8.229999998832227e-05,
+          "root_order_proxy": 0.14673925,
+          "root_partition": 0.006241083000005143
+        }
+      },
+      "selected_guess": null,
+      "status": "timed_out_partial",
+      "support_size": 2315,
+      "timeout_seconds": 44.0,
+      "value": null,
+      "variant": "control"
+    },
+    {
+      "elapsed_seconds": 44.004231125000004,
+      "legal_size": 12974,
+      "matrix_build_seconds": 0.5077142909999992,
+      "root_summary": {
+        "branches_evaluated": 140,
+        "capacity_initializations": 10,
+        "capacity_pruned_actions": 5,
+        "child_h2_exact_solves": 116,
+        "child_h2_solve_requests": 118,
+        "child_h2_value_calls": 117,
+        "matrix_cells": 277721444,
+        "matrix_memory_bytes": 30034810,
+        "root_actions_completed": 4,
+        "root_actions_pruned": 5,
+        "root_actions_pruned_before_first_child": 0,
+        "root_actions_seen": 10,
+        "root_actions_started": 10,
+        "root_actions_traced": 8,
+        "root_branches_processed": 122,
+        "root_branches_traced": 152,
+        "root_pruning_ratio": 0.5,
+        "timing_seconds": {
+          "cache_key": 0.06982482600012929,
+          "child_h2_solve": 37.72532300099996,
+          "pruning": 0.00010420700003521688,
+          "root_order_proxy": 0.12478529199999855,
+          "root_partition": 0.005246666999987326
+        }
+      },
+      "selected_guess": null,
+      "status": "timed_out_partial",
+      "support_size": 2315,
+      "timeout_seconds": 44.0,
+      "value": null,
+      "variant": "after"
+    }
+  ]
+}

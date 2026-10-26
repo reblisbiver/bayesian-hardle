@@ -1157,3 +1157,56 @@ Known boundaries:
 - Timings and skip counts are local research evidence. No remote, device,
   live, business, or supervisor acceptance is claimed.
 - `project-control/PROJECT_STATE.md` was not modified.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-022 uniform-H3 branch-capacity pruning
+
+Status: `READY_FOR_REVIEW` (executor evidence only; supervisor acceptance is
+not claimed)
+
+Issue: `ISSUE-022`
+Branch: `codex/issue-022-uniform-h3-capacity`
+Worktree: `/private/tmp/bayesian-hardle-issue-022`
+Requested base: `a37a22f7a795c7a3434283e204cb860db8f95f0d` (absent from the local
+object database)
+Used visible base: `9ac070cb49b15392da1e5e1dffc22da6c7ec9ed5`
+
+What changed:
+
+- Added exact-safe `uniform_h3_branch_capacity` root pruning for strict
+  uniform five-letter H3 roots. The implementation uses integer units
+  `1` for winning branches and `min(36, n)` for non-winning support `n`, with
+  O(1) decrement as branches are processed.
+- Preserved the existing weighted/nonuniform fallback bound, branch order,
+  lexicographic expected-guesses rule, tie tolerance, and deterministic tie
+  rank.
+- Added adversarial ISSUE-022 tests and benchmark instrumentation.
+
+Fresh evidence:
+
+- Full suite: `110 passed, 9 skipped`.
+- Completed paired support rows 500, 1000, 1250, and 1500 preserved selected
+  guess/value equivalence within `1e-12`.
+- Wall-clock changed `5.181→5.069s`, `39.520→37.401s`,
+  `82.040→80.573s`, and `266.906→271.381s`, respectively: three local wins
+  and one regression.
+- Both variants timed out at their declared windows for support 1750, 2000,
+  and curated `2315 × 12974` H3; no curated exact selected guess/value or
+  confirmation run exists.
+- On completed real rows, pre-child pruning was `0`; capacity pruning occurred
+  after child work. A separate 44s partial curated probe recorded control
+  `12/4` root started/completed, after `10/4`, child H2 exact solves `137/116`,
+  and matrix cells `335429796/277721444`; neither produced an exact selection.
+
+Artifacts:
+
+- `docs/research/issue_022_uniform_h3_branch_capacity.md`
+- `experiments/issue_022_uniform_h3_capacity.py`
+- `experiments/results/issue_022_uniform_h3_capacity.json`
+- `experiments/results/issue_022_uniform_h3_capacity_summary.md`
+- `experiments/results/issue_022_curated_progress.json`
+- `tests/test_issue_022_uniform_h3_capacity.py`
+- `project-control/issues/ISSUE-022-uniform-h3-branch-capacity.md`
+
+`project-control/PROJECT_STATE.md` was not modified. Timings are local
+evidence only; no remote, live, device, business, or supervisor acceptance is
+claimed.
