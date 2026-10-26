@@ -904,3 +904,60 @@ Known boundary:
 - Benchmark timings are local machine evidence; they do not establish remote, device, live, or business acceptance.
 - The largest completed exact state is the curated `2,315` support at horizon `1` via a terminal closed form; the largest completed non-terminal multi-step state is deterministic support `20`, horizon `3`, with `28` legal actions.
 - This report does not advance `PROJECT_STATE.md`; the next state transition requires an independent `[SUPERVISOR REVIEW]`.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-011 exact planner hotspot research
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-011`
+Branch: `codex/issue-011-exact-planner-hotspots`
+Worktree: `.worktrees/issue-011-exact-planner-hotspots`
+Base SHA: `a9f251a321b2fdf2cfd2911a01b1b9b7c23aa17c` (`codex/issue-010-exact-scaling`)
+Result checkpoint: `b42f130`
+
+What changed:
+- Added an exact scalar horizon-2 evaluator and proof-oriented value formula:
+  `success(g) = sum_o max legal candidate mass in branch o` and
+  `expected(g) = 2 - p(g)`.
+- Added exact `ExactFeedbackCodeMatrix` batch evaluation over feedback-code
+  rows, preserving the accepted lexicographic objective and deterministic tie
+  order. The scalar reference planner remains the oracle.
+- Reused normalized mass and matrix eligibility through transition/posterior
+  calls, and added structural counters for states, actions, branches, child
+  support sizes, sorting/grouping, cache reuse, and NumPy/matrix cells.
+- Added `experiments/issue_011_exact_hotspots.py`, deterministic support
+  32/50/100/200/500 horizon-2 rows, support-32 horizon-3, full curated probes,
+  machine-readable JSON, Markdown summary, and cProfile evidence.
+
+Main exact result:
+- Full curated support `2,315` × full legal `12,974` at horizon 2 completed
+  with the batch path in approximately `1.17s` total in the final run,
+  including `0.55s` matrix build and `30,034,810` matrix cells/bytes.
+- The scalar horizon-2 formula completed the same row in approximately
+  `15.09s`; the old ISSUE-010 recursive path timed out at its `30s` bound.
+- This is exact horizon-2 completion evidence only. No horizon-3 full-support
+  feasibility claim is made.
+
+Evidence:
+- `experiments/results/issue_011_exact_hotspots.json`
+- `experiments/results/issue_011_exact_hotspots_summary.md`
+- `experiments/results/issue_011_profiles/`
+- `docs/superpowers/specs/2026-10-26-issue-011-exact-planner-hotspots-design.md`
+- `docs/superpowers/plans/2026-10-26-issue-011-exact-planner-hotspots.md`
+- `project-control/issues/ISSUE-011-exact-planner-hotspots.md`
+
+Fresh verification:
+- `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue011-final-pycache python3 -m unittest discover -s tests -v` — `85` passed, `9` skipped.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue011-final-pycache python3 -m compileall -q src tests experiments` — passed.
+- Package import/version check — passed.
+- JSON/Markdown artifact validation — passed: `51` rows, `50` completed,
+  `1` timeout.
+- `git diff --check` — passed.
+
+Known boundaries:
+- Internal immutable-state rewrite, alternative matrix grouping, and stronger
+  branch bounds were deferred; deeper-horizon scaling remains unknown.
+- Timings are local execution evidence. No remote, device, live, business, or
+  supervisor acceptance is claimed.
+- `project-control/PROJECT_STATE.md` was not modified. Its SHA-256 remained
+  `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
