@@ -355,20 +355,20 @@ class DecisionBehaviorTests(unittest.TestCase):
         # Guessing cigar wins on the 0.6 branch, can recover rebut on the
         # (0, 1) branch, and cannot give final-guess credit to sissy because
         # sissy is not legal in this state.
-        self.assertEqual(
-            planner._guess_value(
-                state, "cigar", legal, self.feedback, self.updater
-            ),
-            (0.9, 1.4),
+        cigar_value = planner._guess_value(
+            state, "cigar", legal, self.feedback, self.updater
         )
+        self.assertIsNotNone(cigar_value)
+        self.assertAlmostEqual(cigar_value[0], 0.9)
+        self.assertAlmostEqual(cigar_value[1], 1.4)
         # A non-answer probe cannot win immediately; its final guess can only
         # recover the largest legal candidate mass in each feedback branch.
-        self.assertEqual(
-            planner._guess_value(
-                state, "adieu", legal, self.feedback, self.updater
-            ),
-            (0.6, 2.0),
+        probe_value = planner._guess_value(
+            state, "adieu", legal, self.feedback, self.updater
         )
+        self.assertIsNotNone(probe_value)
+        self.assertAlmostEqual(probe_value[0], 0.6)
+        self.assertAlmostEqual(probe_value[1], 2.0)
 
     def test_horizon_two_scalar_formula_matches_reference_on_random_weighted_states(self):
         rng = random.Random(20261026)
@@ -408,7 +408,9 @@ class DecisionBehaviorTests(unittest.TestCase):
                     state, guess, legal, self.feedback, self.updater
                 )
                 self.assertIsNotNone(reference_value)
-                self.assertEqual(scalar_value, reference_value)
+                self.assertIsNotNone(scalar_value)
+                self.assertAlmostEqual(scalar_value[0], reference_value[0])
+                self.assertAlmostEqual(scalar_value[1], reference_value[1])
             self.assertEqual(
                 scalar.select_guess(state, legal, self.feedback, self.updater),
                 reference.select_guess(state, legal, self.feedback, self.updater),

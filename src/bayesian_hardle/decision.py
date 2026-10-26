@@ -326,6 +326,8 @@ class ExactBayesOptimalPlanner:
         "action_ordering",
         "branch_ordering",
         "branch_and_bound",
+        "horizon_two_closed_form",
+        "horizon_two_batch",
     )
 
     _STAT_KEYS = (
@@ -341,6 +343,10 @@ class ExactBayesOptimalPlanner:
         "closed_form_singleton_hits",
         "closed_form_last_horizon_hits",
         "closed_form_two_candidate_hits",
+        "horizon_two_scalar_calls",
+        "horizon_two_scalar_actions",
+        "horizon_two_batch_calls",
+        "horizon_two_batch_actions",
     )
 
     def __init__(
@@ -477,6 +483,19 @@ class ExactBayesOptimalPlanner:
             self.cache.put(key, closed_form)
             return closed_form
 
+        if (
+            state.remaining_guesses == 2
+            and self._enabled("horizon_two_closed_form")
+        ):
+            selected = self._horizon_two_best_guess(
+                state,
+                candidate_guesses,
+                feedback_engine,
+                posterior_updater,
+            )
+            self.cache.put(key, selected)
+            return selected
+
         ordered = self._ordered_actions(state, candidate_guesses)
         tie_rank = {
             guess: index
@@ -547,6 +566,16 @@ class ExactBayesOptimalPlanner:
         if closed_form is not None:
             self._value_cache[key] = closed_form
             return closed_form
+
+        horizon_two = self._horizon_two_guess_value(
+            state,
+            guess,
+            candidate_guesses,
+            feedback_engine,
+        )
+        if horizon_two is not None:
+            self._value_cache[key] = horizon_two
+            return horizon_two
 
         mass_table = self._mass_table(state.belief)
         branches = self._transition_branches(
@@ -664,6 +693,90 @@ class ExactBayesOptimalPlanner:
                 self.stats["closed_form_two_candidate_hits"] += 1
                 return self._best_candidate_or_first(state, candidate_guesses)
         return None
+
+    def _horizon_two_best_guess(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+        posterior_updater: PosteriorUpdater,
+    ) -> str:
+        del posterior_updater
+        legal = tuple(candidate_guesses)
+        state_key = self._canonical_key(
+            state,
+            legal,
+            canonicalize=self._enabled("canonical_memoization"),
+        )
+        tie_rank = {
+            guess: index
+            for index, guess in enumerate(
+                tuple(sorted(legal))
+                if self._enabled("canonical_memoization")
+                else legal
+            )
+        }
+        incumbent: Optional[PlannerValue] = None
+        incumbent_guess: Optional[str] = None
+        for guess in legal:
+            self.stats["actions_evaluated"] += 1
+            value = self._horizon_two_guess_value(
+                state,
+                guess,
+                legal,
+                feedback_engine,
+            )
+            if value is None:
+                raise RuntimeError("horizon-two formula unexpectedly unavailable")
+            self.stats["actions_completed"] += 1
+            self._value_cache[("value", state_key, guess)] = value
+            if incumbent is None or self._value_is_better(
+                value,
+                incumbent,
+                guess,
+                incumbent_guess,
+                tie_rank,
+            ):
+                incumbent = value
+                incumbent_guess = guess
+        if incumbent_guess is None:
+            raise RuntimeError("horizon-two formula evaluated no legal action")
+        return incumbent_guess
+
+    def _horizon_two_guess_value(
+        self,
+        state: DecisionState,
+        guess: str,
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+    ) -> Optional[PlannerValue]:
+        if (
+            state.remaining_guesses != 2
+            or not self._enabled("horizon_two_closed_form")
+        ):
+            return None
+        self.stats["horizon_two_scalar_calls"] += 1
+        mass_table = self._mass_table(state.belief)
+        branches = self._transition_branches(
+            state,
+            guess,
+            mass_table,
+            feedback_engine,
+        )
+        legal = set(candidate_guesses)
+        branch_maxima = []
+        for _, _, members in branches:
+            branch_maxima.append(
+                max(
+                    (mass for word, mass in members if word in legal),
+                    default=0.0,
+                )
+            )
+        mass_by_word = dict(mass_table)
+        success_probability = math.fsum(branch_maxima)
+        expected_guesses = 2.0 - mass_by_word.get(guess, 0.0)
+        self.stats["horizon_two_scalar_actions"] += 1
+        return success_probability, expected_guesses
 
     def _best_candidate_or_first(
         self,
