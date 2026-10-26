@@ -8,6 +8,7 @@ import time
 from typing import Dict, Hashable, Optional, Protocol, Sequence, Tuple, runtime_checkable
 
 from .belief import BeliefState, PosteriorUpdater
+from .accelerated import ExactFeedbackCodeMatrix, MatrixInformationGainCalculator
 from .game import Feedback, FeedbackEngine
 from .information import (
     ExactInformationGainCalculator,
@@ -84,7 +85,7 @@ class MAPPolicy:
 
 
 class MaxInformationGainPolicy:
-    """Chooses maximum exact IG, then resolves ties using posterior answer mass."""
+    """Chooses maximum exact IG with a scalar reference and exact fast path."""
 
     def __init__(
         self,
@@ -92,6 +93,8 @@ class MaxInformationGainPolicy:
         partitioner: Optional[OutcomePartitioner] = None,
         information_gain_calculator: Optional[InformationGainCalculator] = None,
         time_limit_seconds: Optional[float] = None,
+        use_acceleration: bool = True,
+        feedback_matrix: Optional[ExactFeedbackCodeMatrix] = None,
     ) -> None:
         if time_limit_seconds is not None and time_limit_seconds <= 0:
             raise ValueError("time_limit_seconds must be positive")
@@ -101,24 +104,79 @@ class MaxInformationGainPolicy:
             information_gain_calculator or ExactInformationGainCalculator()
         )
         self.time_limit_seconds = time_limit_seconds
+        self.use_acceleration = use_acceleration
+        self.feedback_matrix = feedback_matrix
+        self._matrix_cache: Dict[Hashable, ExactFeedbackCodeMatrix] = {}
+        if feedback_matrix is not None:
+            self._matrix_cache[
+                (feedback_matrix.legal_guesses, feedback_matrix.candidate_answers)
+            ] = feedback_matrix
+        self._decision_cache: Dict[Hashable, str] = {}
+        self.decision_cache_hits = 0
+        self.decision_cache_misses = 0
         self._started_at = None
         self.evaluated_guesses = 0
 
-    def select_guess(self, state: DecisionState, candidate_guesses: Sequence[str]) -> str:
-        legal = tuple(candidate_guesses)
-        if not legal:
-            raise ValueError("candidate_guesses cannot be empty")
-        if self._started_at is None:
-            self._started_at = time.perf_counter()
+    @staticmethod
+    def _belief_cache_key(state: DecisionState, legal: Tuple[str, ...]) -> Hashable:
+        if state.belief.probability_mass:
+            total = state.belief.total_mass
+            if total <= 0:
+                raise ValueError("belief must have positive total mass")
+            mass = tuple(
+                sorted(
+                    (word, float(value / total))
+                    for word, value in state.belief.probability_mass
+                )
+            )
+        elif state.belief.candidates:
+            uniform = 1.0 / len(state.belief.candidates)
+            mass = tuple(sorted((word, uniform) for word in state.belief.candidates))
+        else:
+            raise ValueError("belief must contain candidates")
+        return state.remaining_guesses, mass, legal
+
+    def _check_budget(self) -> None:
+        if (
+            self.time_limit_seconds is not None
+            and self._started_at is not None
+            and time.perf_counter() - self._started_at >= self.time_limit_seconds
+        ):
+            raise PolicyBudgetExceeded(
+                f"Max-IG budget exceeded after {self.evaluated_guesses} guess evaluations"
+            )
+
+    def _can_use_acceleration(self) -> bool:
+        return (
+            self.use_acceleration
+            and type(self.partitioner) is ExactOutcomePartitioner
+            and type(self.information_gain_calculator)
+            is ExactInformationGainCalculator
+        )
+
+    def _matrix_for(
+        self, legal: Tuple[str, ...], belief: BeliefState
+    ) -> ExactFeedbackCodeMatrix:
+        candidate_answers = tuple(belief.candidates)
+        key = (legal, candidate_answers)
+        cached = self._matrix_cache.get(key)
+        if cached is not None:
+            return cached
+        for matrix in self._matrix_cache.values():
+            if matrix.legal_guesses == legal and matrix.contains_answers(candidate_answers):
+                self._matrix_cache[key] = matrix
+                return matrix
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, candidate_answers)
+        self._matrix_cache[key] = matrix
+        self.feedback_matrix = matrix
+        return matrix
+
+    def _select_reference(
+        self, state: DecisionState, legal: Tuple[str, ...]
+    ) -> str:
         scored = []
         for guess in legal:
-            if (
-                self.time_limit_seconds is not None
-                and time.perf_counter() - self._started_at >= self.time_limit_seconds
-            ):
-                raise PolicyBudgetExceeded(
-                    f"Max-IG budget exceeded after {self.evaluated_guesses} guess evaluations"
-                )
+            self._check_budget()
             distribution = self.partitioner.partition(
                 state.belief, guess, self.feedback_engine
             )
@@ -127,6 +185,44 @@ class MaxInformationGainPolicy:
             )
             scored.append((gain, guess))
             self.evaluated_guesses += 1
+        return self._resolve_ties(state, scored)
+
+    def _select_accelerated(
+        self, state: DecisionState, legal: Tuple[str, ...]
+    ) -> str:
+        matrix = self._matrix_for(legal, state.belief)
+        scorer = MatrixInformationGainCalculator(matrix)
+        answer_indices, weights = scorer.belief_arrays(state.belief)
+        if len(answer_indices) == 1:
+            # A deterministic singleton produces one outcome for every guess,
+            # so every exact IG is zero.  Resolving the documented tie directly
+            # is equivalent to scoring all rows and avoids redundant work.
+            return self._resolve_ties(
+                state, [(0.0, guess) for guess in legal]
+            )
+        if len(answer_indices) <= scorer.SMALL_BELIEF_BATCH_THRESHOLD:
+            self._check_budget()
+            entropies = scorer.entropies_for_rows(
+                matrix.matrix[:, answer_indices], weights
+            )
+            self.evaluated_guesses += len(legal)
+            return self._resolve_ties(
+                state, list(zip(entropies.tolist(), legal))
+            )
+        scored = []
+        for guess in legal:
+            self._check_budget()
+            gain = scorer.entropy_for_row(
+                matrix.row_for(guess), answer_indices, weights
+            )
+            scored.append((max(0.0, gain), guess))
+            self.evaluated_guesses += 1
+        return self._resolve_ties(state, scored)
+
+    @staticmethod
+    def _resolve_ties(
+        state: DecisionState, scored: Sequence[Tuple[float, str]]
+    ) -> str:
         maximum_gain = max(gain for gain, _ in scored)
         tied = [
             (gain, guess)
@@ -153,6 +249,26 @@ class MaxInformationGainPolicy:
         if answer_ties:
             return max(answer_ties, key=lambda item: item[1])[0]
         return tied[0][1]
+
+    def select_guess(self, state: DecisionState, candidate_guesses: Sequence[str]) -> str:
+        legal = tuple(candidate_guesses)
+        if not legal:
+            raise ValueError("candidate_guesses cannot be empty")
+        if self._started_at is None:
+            self._started_at = time.perf_counter()
+        self._check_budget()
+        key = self._belief_cache_key(state, legal)
+        cached = self._decision_cache.get(key)
+        if cached is not None:
+            self.decision_cache_hits += 1
+            return cached
+        self.decision_cache_misses += 1
+        if self._can_use_acceleration():
+            selected = self._select_accelerated(state, legal)
+        else:
+            selected = self._select_reference(state, legal)
+        self._decision_cache[key] = selected
+        return selected
 
 
 @runtime_checkable

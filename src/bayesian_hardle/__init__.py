@@ -1,5 +1,6 @@
 """Bayesian Hardle research package."""
 
+from .accelerated import ExactFeedbackCodeMatrix, MatrixInformationGainCalculator
 from .belief import (
     BeliefState,
     DeterministicLikelihoodModel,
@@ -62,6 +63,7 @@ __all__ = [
     "BeliefState",
     "BenchmarkSpec",
     "DecisionState",
+    "ExactFeedbackCodeMatrix",
     "DeterministicLikelihoodModel",
     "EntropyCalculator",
     "EpisodeRunner",
@@ -83,6 +85,7 @@ __all__ = [
     "JsonArtifactSink",
     "LikelihoodModel",
     "MAPPolicy",
+    "MatrixInformationGainCalculator",
     "MaxInformationGainPolicy",
     "POLICY_TIE_TOLERANCE",
     "MetricsResult",

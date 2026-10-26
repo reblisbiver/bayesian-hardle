@@ -1,0 +1,7 @@
+{
+  "issue": "ISSUE-005",
+  "seed": 20261025,
+  "requested_episodes": 2315,
+  "max_ig_time_limit_seconds": 30.0,
+  "warm_measurement_repeats": 3
+}
