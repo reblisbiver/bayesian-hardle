@@ -132,18 +132,14 @@ project dependencies:
 PYTHONPATH=src python3 experiments/issue_006_fair_client.py
 ```
 
-## Interactive browser acceptance (ISSUE-007)
+## 交互式浏览器验收（ISSUE-007/008）
 
-Launch the local visual acceptance client from this repository with uv:
+在本仓库中用 uv 启动本地可视化验收界面：
 
 ```bash
 uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py
 ```
 
-Open the local URL Streamlit prints. The **Strategy comparison** tab runs MAP,
-Max-IG, and optional Random independently against the same known target and
-shows one readable table per policy. The **Human vs Solver** tab samples a
-hidden target uniformly from the selected support, returns only human feedback
-while you play, and reveals the target plus the solver's full trajectory only
-after a solve, the ten-guess horizon, or Give up. `curated-2315` is explicitly
-diagnostic / answer-list-aware; it is not the primary fairness mode.
+打开 Streamlit 输出的本地地址。`策略比较`页默认运行最大后验（MAP）和最大信息增益（Max-IG），也可以直接加入随机基线（Random）；每个策略都会显示一张结果表。`人类对战求解器`页会从所选支持集中均匀抽取隐藏目标，游戏结束或主动放弃前只返回人类反馈，之后才显示目标词和求解器完整轨迹。`精选 2,315（curated-2315）`明确标为诊断/答案列表感知模式，不代表主要公平模式。
+
+`精确贝叶斯最优（Exact Bayes-optimal）`会在界面中显示，但当前不支持 12,974 词的全支持模式；已接受的精确规划目前仅在较小词表上可计算并已完成验证。

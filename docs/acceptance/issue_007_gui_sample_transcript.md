@@ -36,7 +36,7 @@ Observed: exact Max-IG solved `aahed` in 7 turns; the run retained support
 `aahed`, and ended with `RESULT solved=True turns=7 total_time_ms=695.264`.
 The cumulative per-turn decision time was `692.531 ms`.
 
-## Streamlit startup and rendered UI
+## Streamlit 启动与界面渲染
 
 Exact OWNER launch command:
 
@@ -51,30 +51,20 @@ You can now view your Streamlit app in your browser.
 Local URL: http://localhost:8505
 ```
 
-Streamlit AppTest rendered both tabs:
+Streamlit AppTest 渲染了两个页签：
 
 ```text
-tabs ['Strategy comparison', 'Human vs Solver']
-buttons ['Run comparison', 'Start New Battle']
+tabs ['策略比较', '人类对战求解器']
+buttons ['运行策略比较', '开始新对战']
 ```
 
-AppTest clicked `Run comparison` with `aahed` and the default MAP/Max-IG
-selection. It reported no app exceptions, two result tables, and solved
-metrics for both policies: MAP `1` turn and Max-IG `7` turns.
+AppTest 确认比较页默认选择最大后验（MAP）和最大信息增益（Max-IG），随机基线（Random）可直接加入比较；精确贝叶斯最优（Exact Bayes-optimal）在界面中明确标记为当前不可用于 12,974 词全支持模式，并说明已接受的精确规划目前仅在较小词表上可计算且已完成验证。以 `aahed` 运行默认策略时无应用异常，并显示两张结果表：MAP `1` 回合，Max-IG `7` 回合。
 
-AppTest started a battle and confirmed the pre-finish view contained the
-neutral hidden-target message, `Your legal guess`, `Submit guess`, `Give up`,
-and `Reset / New Battle`, with no solver table. After one non-terminal human
-guess, the only table columns were `Turn`, `Your guess`, `Feedback (exact,
-misplaced)`, and `Status`. After Give up, a second table appeared with solver
-columns including `Guess`, `Candidates left`, `Entropy (bits)`, `Decision
-(ms)`, and `Cumulative (ms)`.
+AppTest 启动对战并确认结束前显示隐藏目标保密提示、`你的合法猜词`、`提交猜词`、`放弃本局`和`重置 / 新对战`，且不显示求解器表格。一次未结束的人类猜词后，表格列为`回合`、`你的猜词`、`反馈（命中、错位）`和`状态`；主动放弃后才出现求解器表格，其中包含`猜词`、`剩余候选数`、`熵（比特）`、`单步决策时间（毫秒）`和`累计时间（毫秒）`。
 
 ## Automated evidence
 
-- Default Python: `66` tests passed, with `2` Streamlit-only tests skipped
-  because Streamlit is intentionally exercised through uv.
-- uv-managed environment: `66` tests passed, including Streamlit AppTest.
+- uv-managed environment: `70` tests passed, including Streamlit AppTest.
 - `compileall`, `git diff --check`, known-target service tests, battle
   anti-leak transitions, and target/support validation passed.
 - `project-control/PROJECT_STATE.md` was unchanged.
