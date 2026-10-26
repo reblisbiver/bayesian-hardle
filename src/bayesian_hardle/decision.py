@@ -338,6 +338,7 @@ class ExactBayesOptimalPlanner:
         "branches_evaluated",
         "scalar_feedback_evaluations",
         "matrix_transition_calls",
+        "matrix_eligibility_checks",
         "value_cache_hits",
         "value_cache_misses",
         "closed_form_singleton_hits",
@@ -347,6 +348,10 @@ class ExactBayesOptimalPlanner:
         "horizon_two_scalar_actions",
         "horizon_two_batch_calls",
         "horizon_two_batch_actions",
+        "horizon_two_batch_matrix_cells",
+        "action_sort_calls",
+        "branch_grouping_calls",
+        "branch_sort_calls",
     )
 
     def __init__(
@@ -375,6 +380,9 @@ class ExactBayesOptimalPlanner:
         )
         self.feedback_matrix = feedback_matrix
         self.stats: Dict[str, int] = {key: 0 for key in self._STAT_KEYS}
+        self._branch_count_histogram: Dict[str, int] = {}
+        self._branch_size_histogram: Dict[str, int] = {}
+        self._state_support_histogram: Dict[str, int] = {}
 
     def _enabled(self, layer: str) -> bool:
         return layer in self.optimization_layers
@@ -397,6 +405,9 @@ class ExactBayesOptimalPlanner:
             if hasattr(self.cache, "__len__")
             else -1,
             "matrix_memory_bytes": self.matrix_memory_bytes,
+            "branch_count_histogram": dict(sorted(self._branch_count_histogram.items(), key=lambda item: int(item[0]))),
+            "branch_size_histogram": dict(sorted(self._branch_size_histogram.items(), key=lambda item: int(item[0]))),
+            "state_support_histogram": dict(sorted(self._state_support_histogram.items(), key=lambda item: int(item[0]))),
         }
 
     @classmethod
@@ -477,6 +488,11 @@ class ExactBayesOptimalPlanner:
             return cached
         self.cache_misses += 1
         self.stats["states_evaluated"] += 1
+        support_size = len(state.belief.candidates)
+        support_key = str(support_size)
+        self._state_support_histogram[support_key] = (
+            self._state_support_histogram.get(support_key, 0) + 1
+        )
 
         closed_form = self._closed_form_best_guess(state, candidate_guesses)
         if closed_form is not None:
@@ -578,11 +594,18 @@ class ExactBayesOptimalPlanner:
             return horizon_two
 
         mass_table = self._mass_table(state.belief)
+        use_matrix = self._can_use_matrix(
+            state.belief,
+            guess,
+            feedback_engine,
+            mass_table=mass_table,
+        )
         branches = self._transition_branches(
             state,
             guess,
             mass_table,
             feedback_engine,
+            use_matrix=use_matrix,
         )
         success_probability = 0.0
         expected_guesses = 1.0
@@ -598,9 +621,7 @@ class ExactBayesOptimalPlanner:
                     outcome,
                     members,
                     posterior_updater,
-                    use_matrix=self._can_use_matrix(
-                        state.belief, guess, feedback_engine
-                    ),
+                    use_matrix=use_matrix,
                 )
                 next_state = DecisionState(
                     belief=posterior,
@@ -781,6 +802,7 @@ class ExactBayesOptimalPlanner:
             tuple(mass for _, mass in mass_table),
             legal,
         )
+        self.stats["horizon_two_batch_matrix_cells"] += len(legal) * len(answer_words)
         return tuple(values)
 
     def _horizon_two_guess_value(
@@ -865,6 +887,7 @@ class ExactBayesOptimalPlanner:
         legal = tuple(candidate_guesses)
         if not self._enabled("action_ordering"):
             return legal
+        self.stats["action_sort_calls"] += 1
         mass = dict(self._mass_table(state.belief))
         candidates = sorted(
             (guess for guess in legal if guess in mass),
@@ -878,14 +901,17 @@ class ExactBayesOptimalPlanner:
         belief: BeliefState,
         guess: str,
         feedback_engine: FeedbackEngine,
+        mass_table: Optional[Tuple[Tuple[str, float], ...]] = None,
     ) -> bool:
+        self.stats["matrix_eligibility_checks"] += 1
         if not self._enabled("matrix_transitions") or self.feedback_matrix is None:
             return False
         if type(feedback_engine) is not HardleFeedbackEngine:
             return False
         if feedback_engine.game_spec.word_length != self.feedback_matrix.word_length:
             return False
-        mass_table = self._mass_table(belief)
+        if mass_table is None:
+            mass_table = self._mass_table(belief)
         return guess in self.feedback_matrix._guess_indices and self.feedback_matrix.contains_answers(
             tuple(word for word, _ in mass_table)
         )
@@ -896,8 +922,17 @@ class ExactBayesOptimalPlanner:
         guess: str,
         mass_table: Tuple[Tuple[str, float], ...],
         feedback_engine: FeedbackEngine,
+        use_matrix: Optional[bool] = None,
     ) -> Tuple[Tuple[Feedback, float, Tuple[Tuple[str, float], ...]], ...]:
-        if self._can_use_matrix(state.belief, guess, feedback_engine):
+        self.stats["branch_grouping_calls"] += 1
+        if use_matrix is None:
+            use_matrix = self._can_use_matrix(
+                state.belief,
+                guess,
+                feedback_engine,
+                mass_table=mass_table,
+            )
+        if use_matrix:
             assert self.feedback_matrix is not None
             self.stats["matrix_transition_calls"] += 1
             words = tuple(word for word, _ in mass_table)
@@ -924,7 +959,17 @@ class ExactBayesOptimalPlanner:
                 (outcome, math.fsum(mass for _, mass in members), tuple(members))
                 for outcome, members in grouped_scalar.items()
             ]
+        branch_count_key = str(len(branches))
+        self._branch_count_histogram[branch_count_key] = (
+            self._branch_count_histogram.get(branch_count_key, 0) + 1
+        )
+        for _, _, members in branches:
+            branch_size_key = str(len(members))
+            self._branch_size_histogram[branch_size_key] = (
+                self._branch_size_histogram.get(branch_size_key, 0) + 1
+            )
         if self._enabled("branch_ordering"):
+            self.stats["branch_sort_calls"] += 1
             branches.sort(key=lambda item: (-item[1], item[0]))
         return tuple(branches)
 
