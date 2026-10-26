@@ -337,6 +337,83 @@ class DecisionBehaviorTests(unittest.TestCase):
             optimized.stats["actions_evaluated"],
         )
 
+    def test_horizon_two_scalar_formula_counts_only_legal_final_answers(self):
+        weighted = self.state.belief.__class__(
+            candidates=("cigar", "rebut", "sissy"),
+            probability_mass=(
+                ("cigar", 0.6),
+                ("rebut", 0.3),
+                ("sissy", 0.1),
+            ),
+        )
+        state = DecisionState(weighted, remaining_guesses=2)
+        planner = ExactBayesOptimalPlanner(
+            optimization_layers=("horizon_two_closed_form",)
+        )
+        legal = ("adieu", "cigar", "rebut")
+
+        # Guessing cigar wins on the 0.6 branch, can recover rebut on the
+        # (0, 1) branch, and cannot give final-guess credit to sissy because
+        # sissy is not legal in this state.
+        self.assertEqual(
+            planner._guess_value(
+                state, "cigar", legal, self.feedback, self.updater
+            ),
+            (0.9, 1.4),
+        )
+        # A non-answer probe cannot win immediately; its final guess can only
+        # recover the largest legal candidate mass in each feedback branch.
+        self.assertEqual(
+            planner._guess_value(
+                state, "adieu", legal, self.feedback, self.updater
+            ),
+            (0.6, 2.0),
+        )
+
+    def test_horizon_two_scalar_formula_matches_reference_on_random_weighted_states(self):
+        rng = random.Random(20261026)
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        for _ in range(32):
+            selected = tuple(sorted(rng.sample(support, rng.randint(1, len(support)))))
+            raw = [rng.randint(1, 19) for _ in selected]
+            total = float(sum(raw))
+            belief = self.state.belief.__class__(
+                candidates=selected,
+                probability_mass=tuple(
+                    (word, value / total) for word, value in zip(selected, raw)
+                ),
+            )
+            state = DecisionState(belief, remaining_guesses=2)
+            reference = ExactBayesOptimalReferencePlanner()
+            scalar = ExactBayesOptimalPlanner(
+                optimization_layers=("horizon_two_closed_form",)
+            )
+            for guess in legal:
+                reference_value = reference._guess_value(
+                    state, guess, legal, self.feedback, self.updater
+                )
+                scalar_value = scalar._guess_value(
+                    state, guess, legal, self.feedback, self.updater
+                )
+                self.assertIsNotNone(reference_value)
+                self.assertEqual(scalar_value, reference_value)
+            self.assertEqual(
+                scalar.select_guess(state, legal, self.feedback, self.updater),
+                reference.select_guess(state, legal, self.feedback, self.updater),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
