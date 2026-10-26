@@ -694,3 +694,45 @@ Independent post-merge verification passed 44/44 tests. The exact accelerated pa
 Status: DIRECTIVE
 
 The OWNER rejects the curated 2,315-answer subset as the primary fairness assumption for human-comparison claims because a real player is not assumed to know that hidden subset. Primary fair hypothesis support must therefore cover all 12,974 current legal Hardle words. Keep the 2,315 mode only as a diagnostic/answer-list-aware comparison. Build both full-uniform and broad general-English-frequency non-leaking prior modes, with non-zero support for every legal word. Also provide a local interactive acceptance client so the OWNER can enter a target word or manually feed live Hardle feedback and inspect step-by-step guesses, remaining candidates, probabilities/information, and compute time under selectable policies.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-006 fair full-support solver and interactive acceptance client
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-006`
+Branch: `codex/issue-006-fair-client`
+Base SHA: `d5b02dd057739fc54bc4ad31f0f01aff606aff6a`
+Implementation commit: `28ae9a86465162352f58fcd7032eb2fe691df088`
+
+What changed:
+- Added explicit `full-uniform`, `full-frequency`, and `curated-2315` mode contracts. The first two use only the complete 12,974-word legal vocabulary; the curated mode is visibly diagnostic / answer-list-aware.
+- Added `GeneralEnglishFrequencyPrior` using required `wordfreq==3.1.1`, English Zipf frequency, `max(10 ** zipf, 1e-12)`, and normalization. Every legal word retains positive mass; provenance records the source, version, transformation, floor, and `answer_membership_used: false`.
+- Extended the exact duplicate-aware Hardle `uint8` feedback matrix to a vocabulary-identity keyed on-disk `.npy` memmap cache. Added exact matrix-backed posterior filtering without changing scalar reference semantics.
+- Added installed `bayesian-hardle` and `python -m bayesian_hardle.cli` entrypoints with simulated-target, live-assist, and independent compare modes. Live input rejects malformed and posterior-impossible feedback without mutating the belief state.
+- Added TDD coverage, README acceptance commands, sample transcript, benchmark runner/config, machine-readable benchmark JSON, and Markdown summary.
+
+Fresh correctness evidence:
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue006-venv-pycache PYTHONPATH=src /tmp/bayesian-hardle-issue006-venv/bin/python -m unittest discover -s tests -v` — 55/55 passed.
+- Full-support matrix shape `12,974 x 12,974`, dtype `uint8`; matrix codes matched `HardleFeedbackEngine` on duplicate-letter cases and 10,000 deterministic full-support random pairs.
+- Matrix-backed posterior filtering matched the scalar updater on weighted repeated-letter cases and retained legal `aahed` outside curated support under full-support filtering.
+- Fast weighted IG matched the scalar exact reference within `1e-12` on uniform/non-uniform controlled beliefs; existing ISSUE-001..005 behavior remained green.
+- Fair-mode boundary test proves `full-uniform` and `full-frequency` do not call/read curated answer membership; only `curated-2315` does.
+- Actual `wordfreq==3.1.1` venv run solved the legal-but-curated-external `aahed` target in `full-frequency`; installed console-script smoke test and module CLI smoke tests passed.
+- `compileall`, package import/export, `git diff --check`, and final worktree status checks passed. `PROJECT_STATE.md` was unchanged.
+
+Fresh performance evidence on this Mac:
+- Full-support matrix cold construction: `2.963543s`; warm disk load: `0.007340s`.
+- Matrix data memory: `168,324,676` bytes; `.npy` disk footprint: `168,324,804` bytes. Peak RSS delta during the cold build was `408,125,440` bytes.
+- Warm first-move exact Max-IG: full-uniform mean `549.221ms`; full-frequency mean `550.246ms`, three repeats each.
+- Representative interactive latency covered `aahed`, `padel`, `cigar`, and `civic` under both fair modes; `4/8` rows were outside curated support and all `8/8` solved within the ten-turn default horizon.
+- Broad benchmark is explicitly non-exhaustive: deterministic seeded six-target sample, 24 independent mode/policy runs. Primary fair results are in the machine-readable artifact, not substituted with the 2,315-target diagnostic set.
+
+Evidence paths:
+- `experiments/results/issue_006_fair_client.json`
+- `experiments/results/issue_006_fair_client_summary.md`
+- `docs/acceptance/issue_006_sample_transcript.md`
+- `docs/superpowers/plans/2026-10-25-issue-006-fair-client.md`
+
+Known boundary:
+- The package declares `wordfreq==3.1.1`; OWNER setup should run `python3 -m pip install .` before using `full-frequency`. The old system pip in this Mac rejected editable PEP 517 installation, so evidence used the standard wheel install in a dedicated temporary venv. This is an installation-tool limitation, not a solver fallback.
+- Full-support exact Bayes-optimal planning remains out of scope. No scheduled Hardle answer list is supplied to fair-mode inference. Executor evidence remains pending independent SUPERVISOR review.
