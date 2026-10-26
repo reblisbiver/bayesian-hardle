@@ -305,6 +305,33 @@ class AcceleratedMaxIGTests(unittest.TestCase):
             )
             self.assertLessEqual(value[0], action_bound + 1e-12)
 
+    def test_horizon_two_capacity_bounds_dominate_random_weighted_states(self):
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        answers = ("allee", "eagle", "llama", "belle", "civic")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, answers)
+        rng = random.Random(20261029)
+
+        for _ in range(32):
+            selected = tuple(sorted(rng.sample(answers, rng.randint(1, len(answers)))))
+            raw = [rng.randint(1, 23) for _ in selected]
+            total = float(sum(raw))
+            weights = tuple(value / total for value in raw)
+            final_answers = tuple(
+                sorted(rng.sample(legal, rng.randint(1, len(legal))))
+            )
+            exact = matrix.horizon_two_values(
+                legal, selected, weights, final_answers
+            )
+            capacity = matrix.horizon_two_capacity_upper_bound(
+                selected, weights, final_answers
+            )
+            self.assertLessEqual(max(value[0] for value in exact), capacity + 1e-12)
+            for guess, value in zip(legal, exact):
+                action_bound = matrix.horizon_two_action_capacity_upper_bound(
+                    guess, selected, weights, final_answers
+                )
+                self.assertLessEqual(value[0], action_bound + 1e-12)
+
     def test_horizon_two_capacity_bound_respects_legal_final_answer_boundary(self):
         legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
         answers = ("allee", "eagle", "llama", "belle", "civic")

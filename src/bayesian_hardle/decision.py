@@ -660,12 +660,12 @@ class ExactBayesOptimalPlanner:
                     "horizon_two_batch_calls",
                     "horizon_two_batch_actions",
                     "horizon_two_batch_matrix_cells",
-                "horizon_two_child_batch_blocks",
-                "horizon_two_child_batch_children",
-                "horizon_two_child_batch_matrix_cells",
-                "horizon_two_child_batch_peak_temporary_bytes",
-                "horizon_two_child_exact_solves",
-                "horizon_two_bound_only_skips",
+                    "horizon_two_child_batch_blocks",
+                    "horizon_two_child_batch_children",
+                    "horizon_two_child_batch_matrix_cells",
+                    "horizon_two_child_batch_peak_temporary_bytes",
+                    "horizon_two_child_exact_solves",
+                    "horizon_two_bound_only_skips",
                 )
             }
             previous_root_action = self._active_root_action
@@ -1265,6 +1265,8 @@ class ExactBayesOptimalPlanner:
                     exact_solve = True
                 if value is None:
                     raise RuntimeError("cached child action had no exact value")
+                if exact_solve:
+                    self.stats["horizon_two_child_exact_solves"] += 1
                 results[index] = (cached_guess, value, True, exact_solve)
                 continue
 
