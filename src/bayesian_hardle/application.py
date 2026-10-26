@@ -10,8 +10,16 @@ import time
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .accelerated import ExactFeedbackCodeMatrix, MatrixPosteriorUpdater
-from .belief import ExactPosteriorUpdater
-from .decision import DecisionState, MAPPolicy, MaxInformationGainPolicy, Policy, RandomPolicy
+from .belief import ExactPosteriorUpdater, UniformPrior
+from .decision import (
+    DecisionState,
+    ExactBayesOptimalPlanner,
+    MAPPolicy,
+    MaxInformationGainPolicy,
+    Policy,
+    RandomPolicy,
+)
+from .evaluation import PlannerPolicyAdapter
 from .fairness import GeneralEnglishFrequencyPrior, HypothesisMode, resolve_hypothesis_mode
 from .game import (
     Feedback,
@@ -26,6 +34,13 @@ from .information import ShannonEntropyCalculator
 
 MODE_NAMES = ("full-uniform", "full-frequency", "curated-2315")
 POLICY_NAMES = ("random", "map", "max-ig")
+EXACT_POLICY_NAME = "exact"
+SMALL_SCOPE_NAME = "small"
+SMALL_MODE_NAME = "small-exact"
+SMALL_POLICY_NAMES = (*POLICY_NAMES, EXACT_POLICY_NAME)
+SMALL_CANDIDATE_ANSWERS = ("awake", "cigar", "humph", "rebut", "sissy")
+SMALL_LEGAL_GUESSES = ("adieu", "arise", "awake", "cigar", "humph", "rebut", "sissy", "stare")
+SMALL_MAX_GUESSES = 3
 
 
 @dataclass(frozen=True)
@@ -167,16 +182,49 @@ def make_solver_context(
     repository_root: Optional[Path] = None,
     vocabulary: Optional[VocabularyRepository] = None,
     max_guesses: int = 10,
+    scope_name: str = "full",
 ) -> SolverContext:
     if max_guesses <= 0:
         raise ValueError("max_guesses must be positive")
+    if scope_name not in {"full", SMALL_SCOPE_NAME}:
+        raise ValueError(f"unknown solver scope: {scope_name}")
+    if policy_name == EXACT_POLICY_NAME and scope_name != SMALL_SCOPE_NAME:
+        raise ValueError(
+            "Exact Bayes-optimal is only available in the small vocabulary experiment"
+        )
+    if scope_name == SMALL_SCOPE_NAME and mode_name != SMALL_MODE_NAME:
+        raise ValueError("small scope requires the small-exact mode")
     root = repository_root or _default_repository_root()
-    resolved_vocabulary = vocabulary or WordListVocabularyRepository.from_repository_root(root)
-    mode = resolve_hypothesis_mode(
-        mode_name,
-        resolved_vocabulary,
-        frequency_prior=frequency_prior,
-    )
+    if scope_name == SMALL_SCOPE_NAME:
+        if vocabulary is not None:
+            resolved_vocabulary = vocabulary
+        else:
+            resolved_vocabulary = WordListVocabularyRepository(
+                SMALL_LEGAL_GUESSES,
+                SMALL_CANDIDATE_ANSWERS,
+            )
+        mode = HypothesisMode(
+            name=SMALL_MODE_NAME,
+            label="small-exact (ISSUE-004 controlled fixture)",
+            support=tuple(resolved_vocabulary.target_vocabulary()),
+            prior=UniformPrior(),
+            answer_list_aware=False,
+            provenance={
+                "support": "ISSUE-004 controlled small candidate vocabulary",
+                "support_count": len(resolved_vocabulary.target_vocabulary()),
+                "legal_guess_count": len(resolved_vocabulary.legal_guesses()),
+                "prior": "uniform",
+                "answer_membership_used": False,
+                "max_guesses": max_guesses,
+            },
+        )
+    else:
+        resolved_vocabulary = vocabulary or WordListVocabularyRepository.from_repository_root(root)
+        mode = resolve_hypothesis_mode(
+            mode_name,
+            resolved_vocabulary,
+            frequency_prior=frequency_prior,
+        )
     feedback = HardleFeedbackEngine(GameSpec(word_length=5, max_guesses=max_guesses))
     legal = tuple(resolved_vocabulary.legal_guesses())
     matrix = None
@@ -197,6 +245,13 @@ def make_solver_context(
     elif policy_name == "random":
         policy = RandomPolicy(seed=seed)
         updater = ExactPosteriorUpdater(feedback)
+    elif policy_name == EXACT_POLICY_NAME:
+        updater = ExactPosteriorUpdater(feedback)
+        policy = PlannerPolicyAdapter(
+            ExactBayesOptimalPlanner(),
+            feedback,
+            updater,
+        )
     else:
         raise ValueError(f"unknown policy: {policy_name}")
     return SolverContext(
@@ -252,13 +307,15 @@ class SolverSession:
             raise ValueError("max_guesses must be positive")
         normalised = target.strip().lower()
         if normalised not in context.legal_guesses:
-            raise ValueError(
-                f"target {normalised!r} is not in the legal 12,974-word vocabulary"
-            )
+            if context.mode.name == SMALL_MODE_NAME:
+                raise ValueError(
+                    f"target {normalised!r} is not in the selected small legal vocabulary"
+                )
+            raise ValueError(f"target {normalised!r} is not in the legal 12,974-word vocabulary")
         if normalised not in context.mode.support:
             raise ValueError(
-                f"target {normalised!r} is outside {context.mode.label}; "
-                "use a full-support mode for this target"
+                f"target {normalised!r} is outside the selected support "
+                f"for {context.mode.name}"
             )
         self._context = context
         self._target = normalised
@@ -356,6 +413,7 @@ def run_simulation(
     frequency_prior: Optional[GeneralEnglishFrequencyPrior] = None,
     repository_root: Optional[Path] = None,
     vocabulary: Optional[VocabularyRepository] = None,
+    scope_name: str = "full",
 ) -> SimulationResult:
     context = make_solver_context(
         mode_name,
@@ -367,6 +425,7 @@ def run_simulation(
         repository_root=repository_root,
         vocabulary=vocabulary,
         max_guesses=max_guesses,
+        scope_name=scope_name,
     )
     return SolverSession(context, target, max_guesses=max_guesses).run(on_turn=on_turn)
 
@@ -491,8 +550,15 @@ class BattleSession:
 
 
 __all__ = [
+    "EXACT_POLICY_NAME",
     "MODE_NAMES",
     "POLICY_NAMES",
+    "SMALL_CANDIDATE_ANSWERS",
+    "SMALL_LEGAL_GUESSES",
+    "SMALL_MAX_GUESSES",
+    "SMALL_MODE_NAME",
+    "SMALL_POLICY_NAMES",
+    "SMALL_SCOPE_NAME",
     "BattleOutcome",
     "BattlePublicState",
     "BattleSession",

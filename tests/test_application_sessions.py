@@ -10,6 +10,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from bayesian_hardle.application import (  # noqa: E402
     BattleSession,
+    EXACT_POLICY_NAME,
+    SMALL_CANDIDATE_ANSWERS,
+    SMALL_POLICY_NAMES,
     run_simulation,
 )
 from bayesian_hardle.fairness import GeneralEnglishFrequencyPrior  # noqa: E402
@@ -75,6 +78,78 @@ class ApplicationSessionTests(unittest.TestCase):
                 "map",
                 repository_root=self.root,
                 use_cache=False,
+            )
+
+    def test_small_scope_exposes_all_four_policies_through_shared_service(self):
+        self.assertEqual(
+            SMALL_POLICY_NAMES,
+            ("random", "map", "max-ig", EXACT_POLICY_NAME),
+        )
+        results = {
+            policy_name: run_simulation(
+                "awake",
+                "small-exact",
+                policy_name,
+                max_guesses=3,
+                seed=20261025,
+                repository_root=self.root,
+                use_cache=False,
+                scope_name="small",
+            )
+            for policy_name in SMALL_POLICY_NAMES
+        }
+
+        self.assertEqual(set(results), set(SMALL_POLICY_NAMES))
+        for policy_name, result in results.items():
+            self.assertEqual(result.policy_name, policy_name)
+            self.assertEqual(result.mode.name, "small-exact")
+            self.assertEqual(len(result.mode.support), 5)
+            self.assertEqual(result.mode.provenance["legal_guess_count"], 10)
+            self.assertGreaterEqual(len(result.turns), 1)
+            self.assertLessEqual(len(result.turns), 3)
+        self.assertTrue(results["map"].solved)
+        self.assertTrue(results["max-ig"].solved)
+        self.assertTrue(results[EXACT_POLICY_NAME].solved)
+
+    def test_exact_small_fixture_matches_accepted_planner_behavior(self):
+        results = [
+            run_simulation(
+                target,
+                "small-exact",
+                EXACT_POLICY_NAME,
+                max_guesses=3,
+                repository_root=self.root,
+                use_cache=False,
+                scope_name="small",
+            )
+            for target in SMALL_CANDIDATE_ANSWERS
+        ]
+
+        self.assertTrue(all(result.solved for result in results))
+        self.assertEqual([len(result.turns) for result in results], [2] * 5)
+        self.assertEqual([result.turns[0].guess for result in results], ["arise"] * 5)
+
+    def test_full_scope_rejects_exact_before_running_full_support(self):
+        with self.assertRaisesRegex(ValueError, "only available in the small vocabulary"):
+            run_simulation(
+                "aahed",
+                "full-uniform",
+                EXACT_POLICY_NAME,
+                repository_root=self.root,
+                use_cache=False,
+                scope_name="full",
+            )
+
+    def test_small_scope_rejects_legal_word_outside_candidate_support(self):
+        with self.assertRaisesRegex(ValueError, "outside.*small-exact"):
+            run_simulation(
+                "adieu",
+                "small-exact",
+                "map",
+                max_guesses=3,
+                repository_root=self.root,
+                use_cache=False,
+                scope_name="small",
             )
 
     def test_new_battle_samples_from_selected_support_with_injected_rng(self):

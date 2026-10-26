@@ -132,7 +132,7 @@ project dependencies:
 PYTHONPATH=src python3 experiments/issue_006_fair_client.py
 ```
 
-## 交互式浏览器验收（ISSUE-007/008）
+## 交互式浏览器验收（ISSUE-007/008/009）
 
 在本仓库中用 uv 启动本地可视化验收界面：
 
@@ -140,6 +140,13 @@ PYTHONPATH=src python3 experiments/issue_006_fair_client.py
 uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py
 ```
 
-打开 Streamlit 输出的本地地址。`策略比较`页默认运行最大后验（MAP）和最大信息增益（Max-IG），也可以直接加入随机基线（Random）；每个策略都会显示一张结果表。`人类对战求解器`页会从所选支持集中均匀抽取隐藏目标，游戏结束或主动放弃前只返回人类反馈，之后才显示目标词和求解器完整轨迹。`精选 2,315（curated-2315）`明确标为诊断/答案列表感知模式，不代表主要公平模式。
+打开 Streamlit 输出的本地地址。在 `策略比较` 页顶部的 `实验范围` 选择：
 
-`精确贝叶斯最优（Exact Bayes-optimal）`会在界面中显示，但当前不支持 12,974 词的全支持模式；已接受的精确规划目前仅在较小词表上可计算并已完成验证。
+- `全词表（公平主实验）`：继续选择 `full-uniform`、`full-frequency` 或 `curated-2315`，只运行 Random / MAP / Max-IG；Exact 会显示为不可用，并标明“仅小词表精确实验可用”。
+- `小词表（Exact 实验）`：固定使用 ISSUE-004 accepted fixture，包含 5 个候选目标、10 个合法猜词（含仓库自动加入的 `covid`、`padel`）和 3 回合上限。目标输入必须是 `awake`、`cigar`、`humph`、`rebut` 或 `sissy` 之一。
+
+要在一个目标上运行四种策略：选择 `小词表（Exact 实验）`，输入一个候选目标（例如 `awake`），保留默认勾选的 Random / MAP / Max-IG / Exact Bayes-optimal，然后点击 `运行策略比较`。结果会按策略并列显示；每张表包含每回合猜词、反馈、剩余候选数、单步与累计决策时间、状态和回合数。`人类对战求解器`页仍只提供可扩展的三种策略，并明确提示 Exact 比较位于小词表策略比较页。
+
+全词表的 `精选 2,315（curated-2315）` 明确标为诊断/答案列表感知模式，不代表主要公平模式。
+
+`精确贝叶斯最优（Exact Bayes-optimal）`在全词表范围会显示为不可用；它只在上述小词表实验中执行，且复用已接受的精确规划语义。

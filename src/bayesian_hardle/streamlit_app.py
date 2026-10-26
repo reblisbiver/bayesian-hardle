@@ -9,23 +9,41 @@ from typing import Dict, Iterable, List
 import streamlit as st
 
 from bayesian_hardle.application import (
+    EXACT_POLICY_NAME,
     MODE_NAMES,
     POLICY_NAMES,
+    SMALL_CANDIDATE_ANSWERS,
+    SMALL_LEGAL_GUESSES,
+    SMALL_MAX_GUESSES,
+    SMALL_MODE_NAME,
+    SMALL_POLICY_NAMES,
+    SMALL_SCOPE_NAME,
     BattleSession,
     BattlePublicState,
     SimulationResult,
     run_simulation,
 )
+from bayesian_hardle.game import WordListVocabularyRepository
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = PROJECT_ROOT / ".cache" / "bayesian_hardle"
+EXACT_POLICY_LABEL = "精确贝叶斯最优（Exact Bayes-optimal）"
 POLICY_LABELS = {
     "random": "随机基线（Random）",
     "map": "最大后验（MAP）",
     "max-ig": "最大信息增益（Max-IG）",
+    EXACT_POLICY_NAME: EXACT_POLICY_LABEL,
 }
-EXACT_POLICY_LABEL = "精确贝叶斯最优（Exact Bayes-optimal）"
+SCOPE_NAMES = ("full", SMALL_SCOPE_NAME)
+SCOPE_LABELS = {
+    "full": "全词表（公平主实验）",
+    SMALL_SCOPE_NAME: "小词表（Exact 实验）",
+}
+SMALL_VOCABULARY = WordListVocabularyRepository(
+    SMALL_LEGAL_GUESSES,
+    SMALL_CANDIDATE_ANSWERS,
+)
 MODE_LABELS = {
     "full-uniform": "全支持均匀先验（full-uniform）— 严格公平",
     "full-frequency": "全支持频率先验（full-frequency）— 类人先验",
@@ -62,10 +80,15 @@ def _status_text(status: str) -> str:
 
 def _show_error(exc: Exception) -> None:
     message = str(exc)
-    if "not in the legal 12,974-word vocabulary" in message:
+    if "selected small legal vocabulary" in message:
+        detail = "输入词不在小词表的合法猜词集合中，请从页面列出的词表中选择。"
+    elif "not in the legal 12,974-word vocabulary" in message:
         detail = "目标词不在 12,974 个合法词组成的词表中。"
     elif "outside" in message and "support" in message:
-        detail = "目标词不属于当前模式的支持集，请切换到全支持模式。"
+        if "small-exact" in message:
+            detail = "目标词不在小词表的 5 个候选目标支持集中，请从页面列出的候选词中选择。"
+        else:
+            detail = "目标词不属于当前模式的支持集，请切换到全支持模式。"
     elif "not a legal five-letter word" in message:
         detail = "请输入合法的五字母单词。"
     elif "guess must be a string" in message:
@@ -120,36 +143,69 @@ def _render_mode_help(mode_name: str) -> None:
 
 def _render_exact_policy_status() -> None:
     st.info(
-        f"策略状态：{EXACT_POLICY_LABEL} 当前不支持 12,974 词的全支持模式。\n\n"
-        "已接受的精确规划目前仅在较小词表上可计算并已完成验证。"
+        f"策略状态：{EXACT_POLICY_LABEL} 当前不可用于 12,974 词的全词表。\n\n"
+        "仅小词表精确实验可用。已接受的精确规划只在小词表上计算和验证。"
     )
+    st.caption(f"不可用策略：{EXACT_POLICY_LABEL}（仅小词表精确实验可用）")
+
+
+def _render_small_scope_details() -> None:
+    legal = tuple(SMALL_VOCABULARY.legal_guesses())
+    candidates = tuple(SMALL_VOCABULARY.target_vocabulary())
+    st.info(
+        f"固定 ISSUE-004 小词表：候选目标 {len(candidates)} 个，"
+        f"合法猜词 {len(legal)} 个，猜测上限 {SMALL_MAX_GUESSES} 回合。"
+    )
+    st.caption("候选目标：" + "、".join(candidates))
+    st.caption("合法猜词：" + "、".join(legal))
 
 
 def _render_comparison() -> None:
     st.header("策略比较")
-    st.write("输入一个已知的合法目标词，在同一目标上独立比较各策略。")
+    st.write("先选择实验范围，再输入目标词，在同一目标上独立比较各策略。")
+    scope_name = st.selectbox(
+        "实验范围",
+        SCOPE_NAMES,
+        format_func=lambda value: SCOPE_LABELS[value],
+        key="comparison_scope",
+    )
+    if scope_name == SMALL_SCOPE_NAME:
+        mode_name = SMALL_MODE_NAME
+        max_guesses = SMALL_MAX_GUESSES
+        _render_small_scope_details()
+        policy_options = SMALL_POLICY_NAMES
+        policy_default = list(SMALL_POLICY_NAMES)
+        policy_key = "comparison_policies_small"
+    else:
+        mode_name = st.selectbox(
+            "全词表模式",
+            MODE_NAMES,
+            format_func=lambda value: MODE_LABELS[value],
+            key="comparison_mode",
+        )
+        max_guesses = 10
+        _render_mode_help(mode_name)
+        _render_exact_policy_status()
+        policy_options = POLICY_NAMES
+        policy_default = ["map", "max-ig"]
+        policy_key = "comparison_policies_full"
     target = st.text_input(
         "已知目标词",
-        placeholder="例如 aahed",
+        placeholder="例如 awake（小词表）或 aahed（全词表）",
         max_chars=5,
         key="comparison_target",
     )
-    mode_name = st.selectbox(
-        "求解模式",
-        MODE_NAMES,
-        format_func=lambda value: MODE_LABELS[value],
-        key="comparison_mode",
-    )
-    _render_mode_help(mode_name)
-    _render_exact_policy_status()
     policies = st.multiselect(
         "要运行的策略",
-        POLICY_NAMES,
-        default=["map", "max-ig"],
+        policy_options,
+        default=policy_default,
         format_func=lambda value: POLICY_LABELS[value],
-        key="comparison_policies",
+        key=policy_key,
     )
-    st.caption("默认选择最大后验与最大信息增益；随机基线可直接加入比较。")
+    if scope_name == SMALL_SCOPE_NAME:
+        st.caption("小词表默认选择四种策略；可取消部分策略以缩短一次比较。")
+    else:
+        st.caption("全词表默认选择最大后验与最大信息增益；随机基线可直接加入比较。")
     if st.button("运行策略比较", type="primary", key="run_comparison"):
         if not target.strip():
             st.error("请输入一个合法的五字母目标词。")
@@ -167,8 +223,10 @@ def _render_comparison() -> None:
                             target,
                             mode_name,
                             policy_name,
+                            max_guesses=max_guesses,
                             cache_dir=CACHE_DIR,
                             repository_root=PROJECT_ROOT,
+                            scope_name=scope_name,
                         )
                     )
             except (ValueError, RuntimeError) as exc:
@@ -239,6 +297,7 @@ def _render_battle() -> None:
     st.caption(
         "点击“开始新对战”后，系统会从所选支持集中均匀抽取隐藏目标；频率模式仅对求解器先验加权。"
     )
+    st.caption("精确贝叶斯最优（Exact Bayes-optimal）仅在“策略比较”的小词表实验中提供。")
 
     if battle is None:
         if st.button("开始新对战", type="primary", key="start_battle"):
