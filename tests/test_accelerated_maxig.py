@@ -324,6 +324,49 @@ class AcceleratedMaxIGTests(unittest.TestCase):
             )
             self.assertLessEqual(value[0], action_bound + 1e-12)
 
+    def test_horizon_two_ragged_block_matches_scalar_for_heterogeneous_children(self):
+        legal = ("allee", "eagle", "llama", "belle", "civic", "arise")
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(
+            legal, ("allee", "eagle", "llama", "belle", "civic")
+        )
+        answer_words_batch = (
+            ("allee", "eagle", "llama"),
+            ("belle", "civic"),
+            ("allee", "eagle", "llama", "belle", "civic"),
+        )
+        weights_batch = (
+            (0.2, 0.3, 0.5),
+            (0.35, 0.65),
+            (0.07, 0.19, 0.23, 0.31, 0.20),
+        )
+        legal_final_answers = ("allee", "eagle", "arise")
+
+        actual = matrix.horizon_two_values_block(
+            legal,
+            answer_words_batch,
+            weights_batch,
+            legal_final_answers,
+        )
+
+        self.assertEqual(actual.shape, (3, len(legal), 2))
+        self.assertEqual(actual.dtype.name, "float64")
+        for child_index, (words, weights) in enumerate(
+            zip(answer_words_batch, weights_batch)
+        ):
+            expected = matrix.horizon_two_values(
+                legal, words, weights, legal_final_answers
+            )
+            for guess_index, value in enumerate(expected):
+                self.assertAlmostEqual(
+                    actual[child_index, guess_index, 0], value[0], delta=1e-12
+                )
+                self.assertAlmostEqual(
+                    actual[child_index, guess_index, 1], value[1], delta=1e-12
+                )
+        self.assertGreater(
+            matrix.horizon_two_block_temporary_bytes(3, len(legal), 10), 0
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

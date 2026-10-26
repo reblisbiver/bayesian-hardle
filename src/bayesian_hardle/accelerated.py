@@ -443,6 +443,135 @@ class ExactFeedbackCodeMatrix:
             + math.fsum(remaining[: max(0, self.code_count - 1)])
         )
 
+    def horizon_two_block_temporary_bytes(
+        self,
+        child_count: int,
+        guess_count: int,
+        total_answer_count: int,
+    ) -> int:
+        """Estimate the simultaneously live arrays for a ragged H2 block."""
+
+        if child_count <= 0 or guess_count <= 0 or total_answer_count <= 0:
+            raise ValueError("block dimensions must be positive")
+        int_bytes = np.dtype(np.intp).itemsize
+        float_bytes = np.dtype(np.float64).itemsize
+        return int(
+            guess_count * total_answer_count * np.dtype(np.uint8).itemsize
+            + total_answer_count * int_bytes  # answer indices
+            + total_answer_count * float_bytes  # eligible weights
+            + total_answer_count * int_bytes  # child ids
+            + guess_count * int_bytes  # guess indices
+            + child_count * self.code_count * float_bytes  # code maxima
+            + child_count * guess_count * float_bytes  # success
+            + child_count * guess_count * float_bytes  # first-guess mass
+            + child_count * guess_count * float_bytes  # expected temporary
+            + child_count * guess_count * 2 * float_bytes  # output values
+        )
+
+    def horizon_two_values_block(
+        self,
+        guesses: Sequence[str],
+        answer_words_batch: Sequence[Sequence[str]],
+        weights_batch: Sequence[Sequence[float]],
+        legal_final_answers: Sequence[str],
+    ) -> np.ndarray:
+        """Return exact H2 values for several heterogeneous child states.
+
+        The child answer supports are kept ragged.  Their matrix indices and
+        eligible weights are concatenated, one shared ``uint8`` code gather is
+        performed for all legal guess rows, and each row is reduced into
+        ``child_id * code_count + feedback_code`` slots.  This is algebraically
+        the same per-child maximum over feedback buckets as
+        :meth:`horizon_two_values`, but it never allocates a padded
+        ``(children, guesses, max_support)`` tensor.
+        """
+
+        legal_guesses = tuple(guesses)
+        if not legal_guesses:
+            raise ValueError("guesses cannot be empty")
+        if any(guess not in self._guess_indices for guess in legal_guesses):
+            raise ValueError("all guesses must be in the feedback matrix")
+        children = tuple(tuple(words) for words in answer_words_batch)
+        child_weights = tuple(tuple(weights) for weights in weights_batch)
+        if not children:
+            raise ValueError("answer_words_batch cannot be empty")
+        if len(children) != len(child_weights):
+            raise ValueError("weights_batch must match answer_words_batch")
+
+        legal_final = set(legal_final_answers)
+        answer_indices_batch = []
+        eligible_weights_batch = []
+        for words, weights in zip(children, child_weights):
+            if not words:
+                raise ValueError("each child answer support must be non-empty")
+            if len(words) != len(weights):
+                raise ValueError("weights must match each child answer support")
+            if any(answer not in self._answer_indices for answer in words):
+                raise ValueError(
+                    "all child answer words must be in the feedback matrix"
+                )
+            values = np.asarray(
+                tuple(float(weight) for weight in weights), dtype=np.float64
+            )
+            if np.any(~np.isfinite(values)) or np.any(values < 0):
+                raise ValueError("weights must be finite and non-negative")
+            answer_indices_batch.append(self.answer_indices(words))
+            eligible_weights_batch.append(
+                np.asarray(
+                    [
+                        weight if word in legal_final else 0.0
+                        for word, weight in zip(words, values)
+                    ],
+                    dtype=np.float64,
+                )
+            )
+
+        flat_answer_indices = np.concatenate(answer_indices_batch)
+        flat_eligible_weights = np.concatenate(eligible_weights_batch)
+        child_ids = np.concatenate(
+            [
+                np.full(len(words), child, dtype=np.intp)
+                for child, words in enumerate(children)
+            ]
+        )
+        guess_indices = np.asarray(
+            [self._guess_indices[guess] for guess in legal_guesses],
+            dtype=np.intp,
+        )
+        local_guess_indices = {
+            guess: index for index, guess in enumerate(legal_guesses)
+        }
+        codes = self._codes[
+            guess_indices[:, None], flat_answer_indices[None, :]
+        ]
+        child_count = len(children)
+        guess_count = len(legal_guesses)
+        success = np.empty((child_count, guess_count), dtype=np.float64)
+        for guess_index, row in enumerate(codes):
+            maxima = np.zeros(child_count * self.code_count, dtype=np.float64)
+            np.maximum.at(
+                maxima,
+                child_ids * self.code_count + row.astype(np.intp),
+                flat_eligible_weights,
+            )
+            success[:, guess_index] = maxima.reshape(
+                child_count, self.code_count
+            ).sum(axis=1)
+
+        first_guess_mass = np.zeros(
+            (child_count, guess_count), dtype=np.float64
+        )
+        for child, (words, weights) in enumerate(zip(children, child_weights)):
+            for word, weight in zip(words, weights):
+                local_index = local_guess_indices.get(word)
+                if local_index is not None:
+                    first_guess_mass[child, local_index] = float(weight)
+
+        result = np.empty((child_count, guess_count, 2), dtype=np.float64)
+        result[:, :, 0] = success
+        result[:, :, 1] = 2.0 - first_guess_mass
+        return result
+
     def code_for(self, guess: str, answer: str) -> int:
         return int(self._codes[self.guess_index(guess), self.answer_index(answer)])
 
