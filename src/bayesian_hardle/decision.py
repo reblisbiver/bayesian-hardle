@@ -393,7 +393,7 @@ class ExactBayesOptimalPlanner:
 
         return self.feedback_matrix.memory_bytes if self.feedback_matrix is not None else 0
 
-    def instrumentation(self) -> Dict[str, int]:
+    def instrumentation(self) -> Dict[str, object]:
         """Return a stable snapshot of planner counters for benchmark artifacts."""
 
         return {
