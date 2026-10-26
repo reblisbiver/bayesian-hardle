@@ -868,3 +868,39 @@ Fresh verification evidence:
 Known boundary:
 - AppTest and local server startup/readback are local behavioral evidence, not physical-browser, remote, business, or supervisor acceptance.
 - The worktree does not claim supervisor acceptance; the next state transition requires an independent `[SUPERVISOR REVIEW]`.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-010 exact Bayes-optimal scaling audit
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-010`
+Branch: `codex/issue-010-exact-scaling`
+Worktree: `.worktrees/issue-010-exact-scaling`
+Base SHA: `34ec6169ba739547507c71666983f321d1b0ee05` (ISSUE-009 handoff)
+
+Implementation:
+- Kept `ExactBayesOptimalReferencePlanner` as the scalar exhaustive oracle.
+- Added independently selectable exact layers to `ExactBayesOptimalPlanner`: proved singleton/last-horizon/two-candidate closed forms, explicit exact feedback-matrix transitions, normalized canonical state keys, posterior-mass action ordering, posterior-mass branch ordering, and lexicographic branch-and-bound.
+- Branch-and-bound uses a solve-probability upper bound and expected-guess lower bound; incomplete action values are never cached.
+- Small Exact GUI solver contexts now reuse the exact small feedback matrix while preserving the ISSUE-009 four-policy behavior and full-support Exact rejection.
+- Added proof-oriented closed-form tests, canonical-key tests, 24 deterministic random reference-equivalence states, and an adversarial pruning-equivalence test.
+
+Benchmark and profiling evidence:
+- Machine-readable artifact: `experiments/results/issue_010_exact_scaling.json`
+- Summary table and exactness justifications: `experiments/results/issue_010_exact_scaling_summary.md`
+- cProfile evidence: `experiments/results/issue_010_profiles/`
+- The staged driver ran `42` bounded rows; `34` completed and `8` timed out.
+- The fully optimized multi-step ladder completed support `20`, horizon `3`, `28` legal actions. On that row it measured `5.40x` cumulative speedup over scalar baseline, `1,710` pruned actions, `3,864` evaluated branches, and `560` matrix bytes.
+- The curated `2,315` support with full `12,974` legal actions completed only the horizon-1 closed-form probe. Its full matrix was `30,034,810` bytes. The scalar horizon-1 baseline and every horizon-2 layer timed out at the declared `20s` bound; no full-support exact-feasibility claim is made.
+
+Fresh verification:
+- `UV_CACHE_DIR=/tmp/bayesian-hardle-issue010-uv-cache uv run --with . python -m unittest discover -s tests -v` — `81/81` passed.
+- Streamlit smoke subset — `10/10` passed.
+- `PYTHONPYCACHEPREFIX=/tmp/bayesian-hardle-issue010-pycache python3 -m compileall -q src tests experiments` — passed.
+- `git diff --check` — passed.
+- `project-control/PROJECT_STATE.md` SHA-256 remained `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`; the file was not modified.
+
+Known boundary:
+- Benchmark timings are local machine evidence; they do not establish remote, device, live, or business acceptance.
+- The largest completed exact state is the curated `2,315` support at horizon `1` via a terminal closed form; the largest completed non-terminal multi-step state is deterministic support `20`, horizon `3`, with `28` legal actions.
+- This report does not advance `PROJECT_STATE.md`; the next state transition requires an independent `[SUPERVISOR REVIEW]`.
