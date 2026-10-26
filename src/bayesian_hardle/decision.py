@@ -329,8 +329,10 @@ class ExactBayesOptimalPlanner:
         "branch_and_bound",
         "horizon_two_closed_form",
         "horizon_two_batch",
+        "horizon_two_child_batch",
         "root_horizon_two_ordering",
     )
+    HORIZON_TWO_CHILD_BATCH_SIZE = 8
 
     _STAT_KEYS = (
         "states_evaluated",
@@ -351,6 +353,12 @@ class ExactBayesOptimalPlanner:
         "horizon_two_batch_calls",
         "horizon_two_batch_actions",
         "horizon_two_batch_matrix_cells",
+        "horizon_two_child_batch_blocks",
+        "horizon_two_child_batch_children",
+        "horizon_two_child_batch_matrix_cells",
+        "horizon_two_child_batch_peak_temporary_bytes",
+        "horizon_two_child_exact_solves",
+        "horizon_two_bound_only_skips",
         "action_sort_calls",
         "branch_grouping_calls",
         "branch_sort_calls",
@@ -441,6 +449,12 @@ class ExactBayesOptimalPlanner:
             "horizon_two_batch_calls": 0,
             "horizon_two_batch_actions": 0,
             "horizon_two_batch_matrix_cells": 0,
+            "horizon_two_child_batch_blocks": 0,
+            "horizon_two_child_batch_children": 0,
+            "horizon_two_child_batch_matrix_cells": 0,
+            "horizon_two_child_batch_peak_temporary_bytes": 0,
+            "horizon_two_child_exact_solves": 0,
+            "horizon_two_bound_only_skips": 0,
             "timing_seconds": {
                 "root_partition": 0.0,
                 "child_h2_solve": 0.0,
@@ -529,6 +543,13 @@ class ExactBayesOptimalPlanner:
         mass = 1.0 / len(belief.candidates)
         return tuple((word, mass) for word in belief.candidates)
 
+    def _record_state_evaluation(self, state: DecisionState) -> None:
+        self.stats["states_evaluated"] += 1
+        support_key = str(len(state.belief.candidates))
+        self._state_support_histogram[support_key] = (
+            self._state_support_histogram.get(support_key, 0) + 1
+        )
+
     def select_guess(
         self,
         state: DecisionState,
@@ -583,12 +604,7 @@ class ExactBayesOptimalPlanner:
             self._root_first_incumbent_seconds = None
             self._root_final_incumbent_seconds = None
         self.cache_misses += 1
-        self.stats["states_evaluated"] += 1
-        support_size = len(state.belief.candidates)
-        support_key = str(support_size)
-        self._state_support_histogram[support_key] = (
-            self._state_support_histogram.get(support_key, 0) + 1
-        )
+        self._record_state_evaluation(state)
 
         closed_form = self._closed_form_best_guess(state, candidate_guesses)
         if closed_form is not None:
@@ -639,6 +655,12 @@ class ExactBayesOptimalPlanner:
                     "horizon_two_batch_calls",
                     "horizon_two_batch_actions",
                     "horizon_two_batch_matrix_cells",
+                "horizon_two_child_batch_blocks",
+                "horizon_two_child_batch_children",
+                "horizon_two_child_batch_matrix_cells",
+                "horizon_two_child_batch_peak_temporary_bytes",
+                "horizon_two_child_exact_solves",
+                "horizon_two_bound_only_skips",
                 )
             }
             previous_root_action = self._active_root_action
@@ -781,8 +803,133 @@ class ExactBayesOptimalPlanner:
         success_probability = 0.0
         expected_guesses = 1.0
         processed_probability = 0.0
+
+        use_child_batch = (
+            state.remaining_guesses == 3
+            and self._enabled("horizon_two_child_batch")
+        )
+        pending_children: list[Dict[str, Any]] = []
+
+        def check_branch_pruning(branch_index: int) -> bool:
+            if incumbent is None or not self._enabled("branch_and_bound"):
+                return False
+            upper_success = success_probability + max(
+                0.0, 1.0 - processed_probability
+            )
+            prune_started = time.perf_counter()
+            cannot_beat = self._cannot_beat_incumbent(
+                upper_success, expected_guesses, incumbent
+            )
+            if self._active_root_action is not None:
+                self._add_root_timing(
+                    "pruning", time.perf_counter() - prune_started
+                )
+            if cannot_beat:
+                if self._active_root_action is not None:
+                    self._active_root_action["pruned"] = True
+                    self._active_root_action["prune_after_branch_index"] = branch_index
+                    self._active_root_action["prune_upper_success"] = upper_success
+                    self._active_root_action["prune_lower_expected"] = expected_guesses
+                return True
+            return False
+
+        def flush_pending_children() -> bool:
+            nonlocal success_probability
+            nonlocal expected_guesses
+            nonlocal processed_probability
+            if not pending_children:
+                return False
+            child_results = self._evaluate_horizon_two_child_block(
+                pending_children,
+                candidate_guesses,
+                feedback_engine,
+                posterior_updater,
+            )
+            for item, result in zip(pending_children, child_results):
+                branch_index = int(item["branch_index"])
+                probability = float(item["probability"])
+                next_success, next_expected = result[1]
+                if self._active_root_action is not None:
+                    record = self._active_root_action
+                    record["branches"][branch_index]["processed"] = True
+                    child_cache_hit = result[2]
+                    if child_cache_hit:
+                        record["child_cache_hits"] += 1
+                    record["branches"][branch_index]["child_cache_hit"] = (
+                        child_cache_hit
+                    )
+                success_probability += probability * next_success
+                expected_guesses += probability * next_expected
+                processed_probability += probability
+                if check_branch_pruning(branch_index):
+                    pending_children.clear()
+                    return True
+            pending_children.clear()
+            return False
+
         for branch_index, (outcome, probability, members) in enumerate(branches):
             self.stats["branches_evaluated"] += 1
+
+            if use_child_batch:
+                if outcome == (len(guess), 0):
+                    if flush_pending_children():
+                        return None
+                    if self._active_root_action is not None:
+                        self._active_root_action["branches"][branch_index]["processed"] = True
+                    success_probability += probability
+                    processed_probability += probability
+                    if check_branch_pruning(branch_index):
+                        return None
+                    continue
+                if state.remaining_guesses > 1:
+                    posterior = self._posterior_for_branch(
+                        state.belief,
+                        guess,
+                        outcome,
+                        members,
+                        posterior_updater,
+                        use_matrix=use_matrix,
+                    )
+                    next_state = DecisionState(
+                        belief=posterior,
+                        remaining_guesses=state.remaining_guesses - 1,
+                    )
+                    child_key_started = time.perf_counter()
+                    child_key = self._canonical_key(
+                        next_state,
+                        candidate_guesses,
+                        canonicalize=self._enabled("canonical_memoization"),
+                    )
+                    if self._active_root_action is not None:
+                        self._add_root_timing(
+                            "cache_key", time.perf_counter() - child_key_started
+                        )
+                        record = self._active_root_action
+                        record["child_state_solve_requests"] += 1
+                        prior_requests = self._root_child_state_key_counts.get(
+                            child_key, 0
+                        )
+                        self._root_child_state_key_counts[child_key] = prior_requests + 1
+                        if prior_requests == 0:
+                            record["distinct_child_state_keys"] += 1
+                        else:
+                            record["repeated_child_state_hits"] += 1
+                        record["branches"][branch_index]["child_state_key"] = (
+                            self._key_digest(child_key)
+                        )
+                    pending_children.append(
+                        {
+                            "branch_index": branch_index,
+                            "probability": probability,
+                            "state": next_state,
+                            "key": child_key,
+                        }
+                    )
+                    if len(pending_children) >= self.HORIZON_TWO_CHILD_BATCH_SIZE:
+                        if flush_pending_children():
+                            return None
+                    continue
+
             if self._active_root_action is not None:
                 self._active_root_action["branches"][branch_index]["processed"] = True
             if outcome == (len(guess), 0):
@@ -853,25 +1000,10 @@ class ExactBayesOptimalPlanner:
                 success_probability += probability * next_success
                 expected_guesses += probability * next_expected
             processed_probability += probability
-            if incumbent is not None and self._enabled("branch_and_bound"):
-                upper_success = success_probability + max(
-                    0.0, 1.0 - processed_probability
-                )
-                prune_started = time.perf_counter()
-                cannot_beat = self._cannot_beat_incumbent(
-                    upper_success, expected_guesses, incumbent
-                )
-                if self._active_root_action is not None:
-                    self._add_root_timing(
-                        "pruning", time.perf_counter() - prune_started
-                    )
-                if cannot_beat:
-                    if self._active_root_action is not None:
-                        self._active_root_action["pruned"] = True
-                        self._active_root_action["prune_after_branch_index"] = branch_index
-                        self._active_root_action["prune_upper_success"] = upper_success
-                        self._active_root_action["prune_lower_expected"] = expected_guesses
-                    return None
+            if check_branch_pruning(branch_index):
+                return None
+        if use_child_batch and flush_pending_children():
+            return None
         value = (success_probability, expected_guesses)
         self._value_cache[key] = value
         return value
@@ -1000,6 +1132,28 @@ class ExactBayesOptimalPlanner:
         candidate_guesses: Sequence[str],
         feedback_engine: FeedbackEngine,
     ) -> Optional[Tuple[PlannerValue, ...]]:
+        inputs = self._horizon_two_batch_inputs(
+            state, candidate_guesses, feedback_engine
+        )
+        if inputs is None:
+            return None
+        legal, answer_words, weights = inputs
+        assert self.feedback_matrix is not None
+        values = self.feedback_matrix.horizon_two_values(
+            legal,
+            answer_words,
+            weights,
+            legal,
+        )
+        self.stats["horizon_two_batch_matrix_cells"] += len(legal) * len(answer_words)
+        return tuple(values)
+
+    def _horizon_two_batch_inputs(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+    ) -> Optional[Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[float, ...]]]:
         if (
             not self._enabled("horizon_two_batch")
             or self.feedback_matrix is None
@@ -1015,14 +1169,183 @@ class ExactBayesOptimalPlanner:
         answer_words = tuple(word for word, _ in mass_table)
         if not self.feedback_matrix.contains_answers(answer_words):
             return None
-        values = self.feedback_matrix.horizon_two_values(
+        return (
             legal,
             answer_words,
             tuple(mass for _, mass in mass_table),
-            legal,
         )
-        self.stats["horizon_two_batch_matrix_cells"] += len(legal) * len(answer_words)
-        return tuple(values)
+
+    def _select_horizon_two_value_row(
+        self,
+        state: DecisionState,
+        state_key: Hashable,
+        legal: Tuple[str, ...],
+        values: Sequence[Sequence[float]],
+    ) -> Tuple[str, PlannerValue]:
+        tie_rank = {
+            guess: index
+            for index, guess in enumerate(
+                tuple(sorted(legal))
+                if self._enabled("canonical_memoization")
+                else legal
+            )
+        }
+        incumbent: Optional[PlannerValue] = None
+        incumbent_guess: Optional[str] = None
+        for index, (guess, value) in enumerate(zip(legal, values)):
+            planner_value = (float(value[0]), float(value[1]))
+            self.stats["actions_evaluated"] += 1
+            self.stats["actions_completed"] += 1
+            self._value_cache[("value", state_key, guess)] = planner_value
+            if incumbent is None or self._value_is_better(
+                planner_value,
+                incumbent,
+                guess,
+                incumbent_guess,
+                tie_rank,
+            ):
+                incumbent = planner_value
+                incumbent_guess = guess
+        if incumbent_guess is None or incumbent is None:
+            raise RuntimeError("horizon-two formula evaluated no legal action")
+        return incumbent_guess, incumbent
+
+    def _evaluate_horizon_two_child_block(
+        self,
+        pending: Sequence[Dict[str, Any]],
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+        posterior_updater: PosteriorUpdater,
+    ) -> Tuple[Tuple[str, PlannerValue, bool, bool], ...]:
+        """Evaluate pending H2 children, sharing one exact ragged matrix pass."""
+
+        legal = tuple(candidate_guesses)
+        results: list[Optional[Tuple[str, PlannerValue, bool, bool]]] = [
+            None
+        ] * len(pending)
+        batch_items: list[Tuple[int, Dict[str, Any], Tuple[str, ...], Tuple[float, ...]]] = []
+
+        for index, item in enumerate(pending):
+            next_state = item["state"]
+            state_key = item["key"]
+            assert isinstance(next_state, DecisionState)
+            assert isinstance(state_key, tuple)
+            cached_guess = self.cache.get(state_key)
+            if cached_guess is not None:
+                self.cache_hits += 1
+                value = self._value_cache.get(("value", state_key, cached_guess))
+                exact_solve = False
+                if value is None:
+                    started = time.perf_counter()
+                    value = self._guess_value(
+                        next_state,
+                        cached_guess,
+                        legal,
+                        feedback_engine,
+                        posterior_updater,
+                    )
+                    self._add_root_timing(
+                        "child_h2_solve", time.perf_counter() - started
+                    )
+                    exact_solve = True
+                if value is None:
+                    raise RuntimeError("cached child action had no exact value")
+                results[index] = (cached_guess, value, True, exact_solve)
+                continue
+
+            self.cache_misses += 1
+            self._record_state_evaluation(next_state)
+            closed_form = self._closed_form_best_guess(next_state, legal)
+            if closed_form is not None:
+                value = self._closed_form_guess_value(
+                    next_state, closed_form, legal
+                )
+                if value is None:
+                    raise RuntimeError("closed-form child action had no value")
+                self.cache.put(state_key, closed_form)
+                self._value_cache[("value", state_key, closed_form)] = value
+                results[index] = (closed_form, value, False, False)
+                continue
+
+            inputs = self._horizon_two_batch_inputs(
+                next_state, legal, feedback_engine
+            )
+            if inputs is None:
+                started = time.perf_counter()
+                next_guess = self._horizon_two_best_guess(
+                    next_state,
+                    legal,
+                    feedback_engine,
+                    posterior_updater,
+                )
+                self.cache.put(state_key, next_guess)
+                value = self._guess_value(
+                    next_state,
+                    next_guess,
+                    legal,
+                    feedback_engine,
+                    posterior_updater,
+                )
+                self._add_root_timing(
+                    "child_h2_solve", time.perf_counter() - started
+                )
+                if value is None:
+                    raise RuntimeError("child action was unexpectedly pruned")
+                self.stats["horizon_two_child_exact_solves"] += 1
+                results[index] = (next_guess, value, False, True)
+                continue
+            _, answer_words, weights = inputs
+            batch_items.append((index, item, answer_words, weights))
+
+        if batch_items:
+            assert self.feedback_matrix is not None
+            started = time.perf_counter()
+            block_values = self.feedback_matrix.horizon_two_values_block(
+                legal,
+                tuple(answer_words for _, _, answer_words, _ in batch_items),
+                tuple(weights for _, _, _, weights in batch_items),
+                legal,
+            )
+            self._add_root_timing(
+                "child_h2_solve", time.perf_counter() - started
+            )
+            self.stats["horizon_two_child_batch_blocks"] += 1
+            self.stats["horizon_two_child_batch_children"] += len(batch_items)
+            self.stats["horizon_two_child_batch_matrix_cells"] += sum(
+                len(legal) * len(answer_words)
+                for _, _, answer_words, _ in batch_items
+            )
+            self.stats["horizon_two_child_batch_peak_temporary_bytes"] = max(
+                self.stats["horizon_two_child_batch_peak_temporary_bytes"],
+                self.feedback_matrix.horizon_two_block_temporary_bytes(
+                    len(batch_items),
+                    len(legal),
+                    sum(len(answer_words) for _, _, answer_words, _ in batch_items),
+                ),
+            )
+            self.stats["horizon_two_child_exact_solves"] += len(batch_items)
+            for local_index, (index, item, _, _) in enumerate(batch_items):
+                next_state = item["state"]
+                state_key = item["key"]
+                assert isinstance(next_state, DecisionState)
+                assert isinstance(state_key, tuple)
+                next_guess, value = self._select_horizon_two_value_row(
+                    next_state,
+                    state_key,
+                    legal,
+                    block_values[local_index],
+                )
+                self.cache.put(state_key, next_guess)
+                self.stats["horizon_two_batch_calls"] += 1
+                self.stats["horizon_two_batch_actions"] += len(legal)
+                self.stats["horizon_two_batch_matrix_cells"] += len(
+                    legal
+                ) * len(item["state"].belief.candidates)
+                results[index] = (next_guess, value, False, True)
+
+        if any(result is None for result in results):
+            raise RuntimeError("horizon-two child batch missed a result")
+        return tuple(result for result in results if result is not None)
 
     def _horizon_two_guess_value(
         self,

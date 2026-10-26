@@ -648,6 +648,83 @@ class DecisionBehaviorTests(unittest.TestCase):
         self.assertGreater(proxy.instrumentation()["root_order_proxy_calls"], 0)
         self.assertEqual(proxy.instrumentation()["root_actions_seen"], len(legal))
 
+    def test_horizon_three_child_block_matches_control_and_records_exact_work(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        weighted = self.state.belief.__class__(
+            candidates=support,
+            probability_mass=(
+                ("awake", 0.31),
+                ("cigar", 0.07),
+                ("humph", 0.23),
+                ("rebut", 0.19),
+                ("sissy", 0.20),
+            ),
+        )
+        state = DecisionState(weighted, remaining_guesses=3)
+        control_layers = tuple(
+            layer
+            for layer in ExactBayesOptimalPlanner.ALL_OPTIMIZATION_LAYERS
+            if layer != "horizon_two_child_batch"
+        )
+        control = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            optimization_layers=control_layers,
+            root_audit=True,
+        )
+        block = ExactBayesOptimalPlanner(
+            feedback_matrix=matrix,
+            root_audit=True,
+        )
+        reference = ExactBayesOptimalReferencePlanner()
+
+        expected_guess = reference.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        control_guess = control.select_guess(
+            state, legal, self.feedback, self.updater
+        )
+        block_guess = block.select_guess(
+            state, tuple(reversed(legal)), self.feedback, self.updater
+        )
+        self.assertEqual(control_guess, expected_guess)
+        self.assertEqual(block_guess, expected_guess)
+        control_value = control._guess_value(
+            state, control_guess, legal, self.feedback, self.updater
+        )
+        block_value = block._guess_value(
+            state, block_guess, tuple(reversed(legal)), self.feedback, self.updater
+        )
+        reference_value = reference._guess_value(
+            state, expected_guess, legal, self.feedback, self.updater
+        )
+        self.assertEqual(control_value, reference_value)
+        self.assertEqual(block_value, reference_value)
+
+        instrumentation = block.instrumentation()
+        self.assertGreater(instrumentation["horizon_two_child_batch_blocks"], 0)
+        self.assertGreater(instrumentation["horizon_two_child_batch_children"], 0)
+        self.assertGreater(
+            instrumentation["horizon_two_child_batch_matrix_cells"], 0
+        )
+        self.assertGreater(
+            instrumentation["horizon_two_child_batch_peak_temporary_bytes"], 0
+        )
+        self.assertEqual(instrumentation["horizon_two_bound_only_skips"], 0)
+        self.assertGreater(instrumentation["actions_pruned"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
