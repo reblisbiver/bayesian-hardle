@@ -645,3 +645,40 @@ Acceptance boundary:
 
 Infrastructure note:
 - The durable bridge successfully produced the user-visible `PM_JOB_STATUS ... completed` callback and Codex exited with code 0, but the durable job JSON was observed afterward with `status: interrupted`. This is a bridge bookkeeping inconsistency, not a research-result failure, and should be corrected separately from the Hardle solver.
+
+## 2026-10-25 — [EXECUTION REPORT] ISSUE-005 exact Max-IG performance engineering
+
+Status: READY_FOR_REVIEW (executor evidence only; supervisor acceptance is not claimed)
+
+Issue: `ISSUE-005`
+Branch: `codex/issue-005-maxig-speed`
+Base SHA: `70dff41174f2f08169eeeb2b4eccaeab4ea1284b`
+Implementation commit: `45d95688ef3c0d877749f16277ac6589951870fd` (short SHA: `45d9568`)
+
+What changed:
+- Added `ExactFeedbackCodeMatrix`, a read-only exact `uint8` matrix encoded as `exact * 6 + misplaced`, built with vectorized exact-position and duplicate-aware multiset overlap operations. It uses no Wordle 243-color semantics.
+- Added direct weighted outcome-mass entropy scoring for deterministic exact IG, including a vectorized small-belief batch path and an exact singleton zero-IG tie shortcut. Scalar `HardleFeedbackEngine`, `ExactOutcomePartitioner`, and `ExactInformationGainCalculator` remain available as the reference path; `use_acceleration=False` forces it.
+- Added deterministic Max-IG decision caching keyed by normalized posterior mass, remaining horizon, and legal-guess order. Posterior filtering still uses the canonical updater and no hidden scheduled-answer membership is supplied.
+- Declared NumPy as a project dependency and added ISSUE-005 plan, issue record, benchmark entrypoint/config, machine-readable result, summary, and behavior tests.
+
+Fresh correctness evidence:
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v` — 44/44 passed.
+- Matrix feedback matched `HardleFeedbackEngine` on adversarial duplicate-letter cases and a deterministic randomized sample of 10,000 full-vocabulary guess-answer pairs.
+- Fast weighted IG matched the scalar reference within `1e-12` for uniform, non-uniform, repeated-letter, and random subset beliefs; fast/reference policy choices matched on controlled and random weighted states, including tie/cache checks.
+- `python3 -m compileall -q src tests experiments scripts`, package import/export check, JSON artifact assertions, and `git diff --check` — passed.
+- `PROJECT_STATE.md` was unchanged.
+
+Fresh performance evidence on this machine:
+- Full matrix: 12,974 legal guesses x 2,315 candidate answers; `30,034,810` bytes (`28.643 MiB`).
+- Cold first move including matrix construction: `0.610672s`; all `12,974` guesses evaluated; selected opener `stare`.
+- Warm first move with the matrix already built: mean `0.118602s` across three full-row scans (minimum `0.117829s`); all `12,974` guesses evaluated; opener `stare` each time. Both gates pass: cold `<=2.0s`, warm `<=0.5s`.
+- Full existing-scope Max-IG experiment: `2,315/2,315` episodes, solve rate `1.000000`, mean guesses `4.586177`, runtime `18.410387s`, `8,978,008` evaluated guesses, decision cache `8,112` hits / `2,505` misses, completed without the 30s budget.
+- Accepted ISSUE-004 reference: `30.039s`, `603` evaluations, `0` completed episodes. Fresh full-run wall-clock speedup: `1.632x`.
+
+Evidence paths:
+- `experiments/results/issue_005_maxig_speed.json`
+- `experiments/results/issue_005_maxig_speed_summary.md`
+- `docs/superpowers/plans/2026-10-25-issue-005-maxig-speed.md`
+
+Remaining boundary:
+- Results are executor-local and machine-specific, pending independent supervisor review. No research definition, objective, hypothesis space, feedback semantics, or live/business acceptance claim was changed.
