@@ -1102,3 +1102,58 @@ cache-hit/value-miss path. Fresh verification after checkpoint `7fab431`:
 - `git diff --check` passed.
 - `PROJECT_STATE.md` remains unchanged at SHA-256
   `16df9822c1b9267ae20d0f93c7aad5ac7b56b5732827b7c88e63230a3efce825`.
+
+## 2026-10-26 — [EXECUTION REPORT] ISSUE-014 H2 action-space structure and similarity bounds
+
+Status: `READY_FOR_REVIEW` (executor evidence only; supervisor acceptance is not
+claimed)
+
+Issue: `ISSUE-014`
+Branch: `codex/issue-014-h2-action-similarity`
+Worktree: `/private/tmp/bayesian-hardle-issue-014`
+Base SHA: `b50f3ba541327264e86b63137c3f37896b576dc8`
+
+What was measured:
+
+- Reconstructed ISSUE-013 H3 child supports for completed ladder cases at
+  support 100, 200, 500, 750, and 1000, plus a bounded curated-2315 frontier
+  from eight deterministic root guesses.
+- Canonicalized all legal-guess feedback rows into unlabeled candidate
+  partitions and separated partition equivalence from exact lexicographic
+  action equivalence.
+- Proved and tested the exact safe collapse key `(partition, immediate-hit
+  posterior mass)`. Partition-only grouping is unsound for expected guesses.
+- Proved and adversarially tested the sufficient dominance condition: a finer
+  partition plus no smaller immediate-hit mass cannot be worse under H2.
+- Derived total-variation fixed-action and optimal-value bounds, then replayed
+  nearest solved-state neighbors with exact target values and incumbent skip
+  simulation.
+
+Decision:
+
+- No planner optimization was integrated. Safe partition collapse reduced the
+  sampled H2 logical cells by `5.9446%`, while a standalone representative
+  collapse evaluator was `6.2x` to `35.7x` slower than the existing matrix
+  evaluator.
+- Dominance had zero examined-pair violations but only `0.1184%` sampled
+  strict-dominance cell reduction after closed-form states were excluded.
+- Similarity bounds preserved the exact best value in every replay, but
+  completed support 500/750/1000 ladder samples had high-support strict skip
+  ratio `0.2715%` and nearest-neighbor distance means `0.8567`, `0.8903`, and
+  `0.9181`. The curated bounded frontier is not a full H3 feasibility claim.
+
+Evidence:
+
+- `docs/research/issue_014_h2_action_similarity.md`
+- `experiments/results/issue_014_h2_action_similarity.json`
+- `experiments/results/issue_014_h2_action_similarity_summary.md`
+- `experiments/issue_014_h2_action_similarity.py`
+- `tests/test_issue_014_action_similarity.py`
+
+Known boundaries:
+
+- The curated 2315 x 12974 H3 run was not completed; only a bounded child
+  frontier was audited.
+- Timings and skip counts are local research evidence. No remote, device,
+  live, business, or supervisor acceptance is claimed.
+- `project-control/PROJECT_STATE.md` was not modified.
