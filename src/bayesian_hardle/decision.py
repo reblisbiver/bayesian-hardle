@@ -718,14 +718,25 @@ class ExactBayesOptimalPlanner:
         }
         incumbent: Optional[PlannerValue] = None
         incumbent_guess: Optional[str] = None
-        for guess in legal:
-            self.stats["actions_evaluated"] += 1
-            value = self._horizon_two_guess_value(
-                state,
-                guess,
-                legal,
-                feedback_engine,
+        batch_values = self._horizon_two_batch_values(
+            state, legal, feedback_engine
+        )
+        if batch_values is not None:
+            self.stats["horizon_two_batch_calls"] += 1
+            self.stats["horizon_two_batch_actions"] += len(legal)
+            values = batch_values
+        else:
+            values = tuple(
+                self._horizon_two_guess_value(
+                    state,
+                    guess,
+                    legal,
+                    feedback_engine,
+                )
+                for guess in legal
             )
+        for guess, value in zip(legal, values):
+            self.stats["actions_evaluated"] += 1
             if value is None:
                 raise RuntimeError("horizon-two formula unexpectedly unavailable")
             self.stats["actions_completed"] += 1
@@ -742,6 +753,35 @@ class ExactBayesOptimalPlanner:
         if incumbent_guess is None:
             raise RuntimeError("horizon-two formula evaluated no legal action")
         return incumbent_guess
+
+    def _horizon_two_batch_values(
+        self,
+        state: DecisionState,
+        candidate_guesses: Sequence[str],
+        feedback_engine: FeedbackEngine,
+    ) -> Optional[Tuple[PlannerValue, ...]]:
+        if (
+            not self._enabled("horizon_two_batch")
+            or self.feedback_matrix is None
+            or type(feedback_engine) is not HardleFeedbackEngine
+            or feedback_engine.game_spec.word_length
+            != self.feedback_matrix.word_length
+        ):
+            return None
+        legal = tuple(candidate_guesses)
+        if not all(guess in self.feedback_matrix._guess_indices for guess in legal):
+            return None
+        mass_table = self._mass_table(state.belief)
+        answer_words = tuple(word for word, _ in mass_table)
+        if not self.feedback_matrix.contains_answers(answer_words):
+            return None
+        values = self.feedback_matrix.horizon_two_values(
+            legal,
+            answer_words,
+            tuple(mass for _, mass in mass_table),
+            legal,
+        )
+        return tuple(values)
 
     def _horizon_two_guess_value(
         self,

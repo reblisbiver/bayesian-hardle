@@ -416,6 +416,66 @@ class DecisionBehaviorTests(unittest.TestCase):
                 reference.select_guess(state, legal, self.feedback, self.updater),
             )
 
+    def test_horizon_two_matrix_batch_matches_scalar_and_reference_with_duplicates(self):
+        support = ("awake", "cigar", "humph", "rebut", "sissy")
+        legal = (
+            "adieu",
+            "arise",
+            "awake",
+            "cigar",
+            "covid",
+            "humph",
+            "padel",
+            "rebut",
+            "sissy",
+            "stare",
+        )
+        matrix = ExactFeedbackCodeMatrix.from_vocabulary(legal, support)
+        rng = random.Random(20261027)
+        for _ in range(24):
+            selected = tuple(sorted(rng.sample(support, rng.randint(2, len(support)))))
+            raw = [rng.randint(1, 19) for _ in selected]
+            total = float(sum(raw))
+            belief = self.state.belief.__class__(
+                candidates=selected,
+                probability_mass=tuple(
+                    (word, value / total) for word, value in zip(selected, raw)
+                ),
+            )
+            state = DecisionState(belief, remaining_guesses=2)
+            reference = ExactBayesOptimalReferencePlanner()
+            scalar = ExactBayesOptimalPlanner(
+                optimization_layers=("horizon_two_closed_form",)
+            )
+            batch = ExactBayesOptimalPlanner(
+                feedback_matrix=matrix,
+                optimization_layers=(
+                    "matrix_transitions",
+                    "canonical_memoization",
+                    "horizon_two_closed_form",
+                    "horizon_two_batch",
+                ),
+            )
+            for guess in legal:
+                scalar_value = scalar._guess_value(
+                    state, guess, legal, self.feedback, self.updater
+                )
+                batch_value = batch._guess_value(
+                    state, guess, legal, self.feedback, self.updater
+                )
+                reference_value = reference._guess_value(
+                    state, guess, legal, self.feedback, self.updater
+                )
+                self.assertAlmostEqual(batch_value[0], scalar_value[0])
+                self.assertAlmostEqual(batch_value[1], scalar_value[1])
+                self.assertAlmostEqual(batch_value[0], reference_value[0])
+                self.assertAlmostEqual(batch_value[1], reference_value[1])
+            self.assertEqual(
+                batch.select_guess(state, legal, self.feedback, self.updater),
+                reference.select_guess(state, legal, self.feedback, self.updater),
+            )
+        self.assertGreater(batch.stats["horizon_two_batch_calls"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

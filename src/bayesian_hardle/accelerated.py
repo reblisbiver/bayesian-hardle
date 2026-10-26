@@ -301,6 +301,62 @@ class ExactFeedbackCodeMatrix:
     def row_for(self, guess: str) -> np.ndarray:
         return self._codes[self.guess_index(guess)]
 
+    def horizon_two_values(
+        self,
+        guesses: Sequence[str],
+        answer_words: Sequence[str],
+        weights: Sequence[float],
+        legal_final_answers: Sequence[str],
+    ) -> Tuple[Tuple[float, float], ...]:
+        """Return exact two-guess values for all supplied first guesses.
+
+        The success probability is the sum, over feedback codes, of the
+        largest posterior mass of a legal final answer in that code bucket.
+        The expected-guess component is ``2 - P(answer == first_guess)``.
+        ``weights`` must already be normalized to the supplied answer words.
+        """
+
+        guesses = tuple(guesses)
+        answer_words = tuple(answer_words)
+        if not guesses or not answer_words:
+            raise ValueError("guesses and answer_words cannot be empty")
+        if len(answer_words) != len(weights):
+            raise ValueError("weights must match answer_words")
+        if any(guess not in self._guess_indices for guess in guesses):
+            raise ValueError("all guesses must be in the feedback matrix")
+        if any(answer not in self._answer_indices for answer in answer_words):
+            raise ValueError("all answer_words must be in the feedback matrix")
+
+        values = np.asarray(tuple(float(weight) for weight in weights), dtype=np.float64)
+        if np.any(~np.isfinite(values)) or np.any(values < 0):
+            raise ValueError("weights must be finite and non-negative")
+        legal_final = set(legal_final_answers)
+        eligible = np.asarray(
+            [weight if word in legal_final else 0.0 for word, weight in zip(answer_words, values)],
+            dtype=np.float64,
+        )
+        guess_indices = np.asarray(
+            [self._guess_indices[guess] for guess in guesses], dtype=np.intp
+        )
+        answer_indices = np.asarray(
+            [self._answer_indices[answer] for answer in answer_words], dtype=np.intp
+        )
+        codes = self._codes[guess_indices][:, answer_indices]
+        maxima = np.zeros((len(guesses), self.code_count), dtype=np.float64)
+        for row_index, row in enumerate(codes):
+            np.maximum.at(maxima[row_index], row, eligible)
+
+        success = maxima.sum(axis=1)
+        mass_by_word = dict(zip(answer_words, values.tolist()))
+        expected = np.asarray(
+            [2.0 - mass_by_word.get(guess, 0.0) for guess in guesses],
+            dtype=np.float64,
+        )
+        return tuple(
+            (float(success[index]), float(expected[index]))
+            for index in range(len(guesses))
+        )
+
     def code_for(self, guess: str, answer: str) -> int:
         return int(self._codes[self.guess_index(guess), self.answer_index(answer)])
 
