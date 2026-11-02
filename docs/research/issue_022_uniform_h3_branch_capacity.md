@@ -1,7 +1,7 @@
 # ISSUE-022 — Exact uniform-H3 branch-capacity pruning
 
-Status: `IMPLEMENTED — REPRODUCIBLE_LOCAL_RESULT`. This is executor
-evidence only; no external validation is claimed and
+Status: `IMPLEMENTED — REPRODUCIBLE_LOCAL_RESULT`. This is local reproducibility
+evidence; no external validation is claimed and
 The solver state contract is unchanged.
 
 The requested ISSUE-021 base `a37a22f7a795c7a3434283e204cb860db8f95f0d` is not

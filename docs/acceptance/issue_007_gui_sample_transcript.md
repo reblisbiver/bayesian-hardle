@@ -4,7 +4,7 @@ Date: 2026-10-25
 Branch: `codex/issue-007-interactive-gui`
 
 This is local acceptance evidence. It demonstrates local service,
-AppTest, and Streamlit startup behavior; it is not supervisor or live/business
+AppTest, and Streamlit startup behavior; it is not a live/business acceptance claim
 acceptance.
 
 ## Known-target service runs

@@ -1,7 +1,7 @@
 # ISSUE-014 — H2 action-space structure and similarity-bound research
 
 Status: `REPRODUCIBLE_LOCAL_RESULT` — local evidence. No planner optimization
-was integrated and `project-control/PROJECT_STATE.md` was not modified.
+was integrated and the solver state contract was not modified.
 
 Base: `b50f3ba541327264e86b63137c3f37896b576dc8` on
 `codex/issue-013-horizon2-bounds-batch`.

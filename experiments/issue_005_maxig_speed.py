@@ -140,7 +140,7 @@ def main() -> None:
         "full_experiment": full_result,
         "prior_accepted_measurement": prior_measurement,
         "speedup_vs_prior_wall_clock": speedup,
-        "evidence_boundary": "executor-local tests and reproducible local measurements; recorded as local reproducibility evidence",
+        "evidence_boundary": "local tests and reproducible local measurements; recorded as local reproducibility evidence",
     }
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
     RESULT_PATH.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
