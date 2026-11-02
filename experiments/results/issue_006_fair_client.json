@@ -450,7 +450,7 @@
       "turns": 6
     }
   ],
-  "status": "executor-evidence",
+  "status": "local-evidence",
   "vocabulary": {
     "curated_count": 2315,
     "full_support_matrix_shape": [

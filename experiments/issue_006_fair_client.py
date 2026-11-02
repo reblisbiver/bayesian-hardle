@@ -153,7 +153,7 @@ def main():
 
         artifact = {
             "issue": "ISSUE-006",
-            "status": "executor-evidence",
+            "status": "local-evidence",
             "machine": {
                 "platform": platform.platform(),
                 "python": platform.python_version(),
@@ -193,7 +193,7 @@ def main():
     lines = [
         "# ISSUE-006 fair-client benchmark summary",
         "",
-        "Status: executor evidence only; not supervisor acceptance.",
+        "Status: local evidence; not an external validation claim.",
         "",
         f"- Full-support matrix: {artifact['vocabulary']['full_support_matrix_shape'][0]} x "
         f"{artifact['vocabulary']['full_support_matrix_shape'][1]} uint8; memory "

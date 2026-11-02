@@ -1,6 +1,6 @@
 # ISSUE-004 first experiment
 
-This is executor-local evidence, not supervisor acceptance.
+This is local evidence, not an external validation claim.
 
 ## Scope
 

@@ -3,7 +3,7 @@
 Date: 2026-10-25
 Branch: `codex/issue-007-interactive-gui`
 
-This is executor-local acceptance evidence. It demonstrates local service,
+This is local acceptance evidence. It demonstrates local service,
 AppTest, and Streamlit startup behavior; it is not supervisor or live/business
 acceptance.
 
@@ -67,5 +67,5 @@ AppTest 启动对战并确认结束前显示隐藏目标保密提示、`你的�
 - uv-managed environment: `70` tests passed, including Streamlit AppTest.
 - `compileall`, `git diff --check`, known-target service tests, battle
   anti-leak transitions, and target/support validation passed.
-- `project-control/PROJECT_STATE.md` was unchanged.
+- The solver state contract was unchanged.
 

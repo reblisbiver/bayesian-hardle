@@ -1,6 +1,6 @@
 # ISSUE-005 exact Max-IG performance
 
-This is executor-local evidence, not supervisor acceptance.
+This is local evidence, not an external validation claim.
 
 ## Performance gate
 

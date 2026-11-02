@@ -199,7 +199,7 @@ def main() -> None:
             "planner_cache_hits": planner.cache_hits,
             "planner_cache_misses": planner.cache_misses,
         },
-        "evidence_boundary": "executor-local tests and reproducible local experiments; pending supervisor review",
+        "evidence_boundary": "executor-local tests and reproducible local experiments; recorded as local reproducibility evidence",
     }
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
     RESULT_PATH.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -207,7 +207,7 @@ def main() -> None:
     lines = [
         "# ISSUE-004 first experiment",
         "",
-        "This is executor-local evidence, not supervisor acceptance.",
+        "This is local evidence, not an external validation claim.",
         "",
         "## Scope",
         "",

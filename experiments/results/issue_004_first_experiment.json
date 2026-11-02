@@ -1,5 +1,5 @@
 {
-  "evidence_boundary": "executor-local tests and reproducible local experiments; pending supervisor review",
+  "evidence_boundary": "executor-local tests and reproducible local experiments; recorded as local reproducibility evidence",
   "full_scope": {
     "max_ig_time_limit_seconds": 30.0,
     "requested_episodes": 2315,

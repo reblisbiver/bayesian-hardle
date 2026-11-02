@@ -1,6 +1,6 @@
 # ISSUE-014 — H2 action-space structure and similarity-bound research
 
-Status: `READY_FOR_REVIEW` — executor evidence only. No planner optimization
+Status: `REPRODUCIBLE_LOCAL_RESULT` — local evidence. No planner optimization
 was integrated and `project-control/PROJECT_STATE.md` was not modified.
 
 Base: `b50f3ba541327264e86b63137c3f37896b576dc8` on

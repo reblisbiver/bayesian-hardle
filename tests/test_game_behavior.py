@@ -53,7 +53,7 @@ class GameBehaviorTests(unittest.TestCase):
         self.assertEqual(repository.target_vocabulary(), ("cigar", "rebut"))
         self.assertNotIn("covid", repository.target_vocabulary())
 
-    def test_vendored_supervisor_inputs_have_declared_counts(self):
+    def test_prepared_inputs_have_declared_counts(self):
         repository = WordListVocabularyRepository.from_repository_root(PROJECT_ROOT)
         base_lines = (PROJECT_ROOT / "data/wordlists/wordle-legal-guesses.txt").read_text(
             encoding="utf-8"

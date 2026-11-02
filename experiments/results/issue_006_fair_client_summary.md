@@ -1,6 +1,6 @@
 # ISSUE-006 fair-client benchmark summary
 
-Status: executor evidence only; not supervisor acceptance.
+Status: local evidence; not an external validation claim.
 
 - Full-support matrix: 12974 x 12974 uint8; memory 168,324,676 bytes; disk 168,324,804 bytes.
 - Cold build: 2.963543s; warm load: 0.007340s.

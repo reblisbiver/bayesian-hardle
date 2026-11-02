@@ -1,5 +1,5 @@
 {
-  "evidence_boundary": "executor-local tests and reproducible local measurements; pending supervisor review",
+  "evidence_boundary": "executor-local tests and reproducible local measurements; recorded as local reproducibility evidence",
   "full_experiment": {
     "completed_episodes": 2315,
     "decision_cache_hits": 8112,
