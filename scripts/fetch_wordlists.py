@@ -1,4 +1,4 @@
-"""Fetch the supervisor-specified ISSUE-004 vocabulary inputs."""
+"""Fetch and verify the pinned vocabulary inputs used by Bayesian Hardle."""
 
 from __future__ import annotations
 

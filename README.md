@@ -1,152 +1,92 @@
 # Bayesian Hardle
 
-Bayesian Hardle is a research codebase for studying Bayesian reasoning in a
-Hardle-style word-feedback environment.
+Bayesian Hardle is a research-oriented solver for a Hardle-style word-feedback game. It treats each round as sequential Bayesian inference: maintain a posterior over candidate answers, partition possible feedback outcomes, measure expected information gain, and choose the next action with policies ranging from random and MAP baselines to Max-IG and exact finite-horizon planning on tractable scopes.
 
-The repository contains an executor implementation of the exact Bayesian
-core for ISSUE-004. The formal communication and audit records live in
-[`project-control/`](project-control/README.md). These local tests and
-experiments remain unaccepted until a supervisor review records acceptance.
+The project is useful as a compact example of **Bayesian inference, information theory, sequential decision-making, and exact-vs-scalable planning** in one reproducible system.
 
-## Layout
+## What is implemented
 
-- `src/bayesian_hardle/` — package code.
-- `tests/` — behavior-oriented tests.
-- `experiments/` — reproducible experiment inputs, runners, and outputs.
-- `data/wordlists/` — vendored supervisor-specified vocabularies plus source
-  provenance.
-- `scripts/` — small operational helpers.
-- `docs/` — research and engineering documentation.
-- `project-control/` — append-only handoffs and current accepted state.
+- Duplicate-aware Hardle feedback semantics.
+- Uniform priors and deterministic posterior filtering.
+- Shannon entropy, expected posterior entropy, and information gain.
+- Random, MAP, and Max-Information-Gain policies.
+- An exact finite-horizon Bayesian planner for declared small scopes.
+- Accelerated Max-IG and exact-planner paths with regression tests.
+- A CLI plus an interactive Streamlit interface for solver-vs-game experiments.
+- Reproducible experiment scripts and machine-readable result artifacts.
 
-## Component scaffold (ISSUE-003)
+## Architecture
 
-The package now implements the settled exact semantics: duplicate-aware
-feedback, a uniform prior, deterministic posterior filtering, Shannon
-entropy/expected posterior entropy/information gain, Random/MAP/Max-IG, and
-an exact finite-horizon planner for small vocabularies. Evaluation keeps
-hidden targets outside the solver state.
+The runtime loop is deliberately split into five boundaries:
 
-| Group | Module | Public boundary |
-| --- | --- | --- |
-| Game Model | `game.py` | `VocabularyRepository`, `GameSpec`, `FeedbackEngine`, `TerminalRules` |
-| Bayesian Belief Engine | `belief.py` | `PriorModel`, `BeliefState`, `LikelihoodModel`, `PosteriorUpdater` |
-| Information Engine | `information.py` | `OutcomePartitioner`, `EntropyCalculator`, `ExpectedEntropyCalculator`, `InformationGainCalculator` |
-| Decision Engine | `decision.py` | `DecisionState`, `Policy`, placeholder policies, `BayesOptimalPlanner`, `PlannerCache` |
-| Evaluation & Experiment System | `evaluation.py` | `EpisodeRunner`, `BenchmarkSpec`, `MetricsResult`, `ExperimentConfig`, `ArtifactSink` |
+1. **Game model** defines legal actions, hidden targets, feedback, and terminal rules.
+2. **Belief engine** updates the posterior from observed guess/feedback pairs.
+3. **Information engine** partitions outcomes and computes entropy/information gain.
+4. **Decision engine** selects actions from the current belief and remaining horizon.
+5. **Evaluation layer** runs episodes and records metrics without exposing the hidden target to the solver.
 
-The intended runtime information flow is:
+This separation makes it possible to compare decision policies while keeping the game and belief semantics fixed.
 
-1. The Game Model supplies legal guesses, target vocabulary, game limits, and the shared feedback boundary.
-2. The Belief Engine consumes a prior and observed guess/feedback history and exposes a `BeliefState`.
-3. The Information Engine consumes that belief, candidate guesses, and the shared feedback boundary for outcome partitions and future information values.
-4. The Decision Engine consumes `DecisionState(belief, remaining_guesses)` plus shared game/information interfaces and selects a guess.
-5. The Game Model evaluates the guess against the hidden target and returns feedback.
-6. The Belief Engine receives the observation, updates the posterior boundary, and the decision horizon decreases.
-7. Evaluation wraps the loop and records metrics/artifacts without changing game semantics.
+![Bayesian Hardle system architecture](docs/figures/fig1_system_architecture.png)
 
-## Local verification
+## Setup
 
-Run the standard-library test suite from the repository root:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+python3 scripts/fetch_wordlists.py
+```
+
+The vocabulary preparation script downloads two pinned upstream word lists, verifies their SHA-256 hashes and expected counts, and writes the local files used by the experiments. The lists are intentionally not redistributed in this repository; see `data/wordlists/provenance.json` and `scripts/fetch_wordlists.py` for exact source revisions.
+
+## Verify
+
+Run the full test suite:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Run the first controlled experiment with:
+Run the CLI:
 
 ```bash
-PYTHONPATH=src python3 experiments/issue_004_first_experiment.py
+bayesian-hardle --help
 ```
 
-It writes `experiments/results/issue_004_first_experiment.json` and a short
-Markdown summary. The full Random/MAP comparison uses all 2,315 candidate
-answers and 12,974 legal guesses. Full Max-IG uses that same scope; its
-configured wall-clock limit is reported as a scaling measurement if reached,
-not replaced by a smaller vocabulary. Exact Bellman planning is deliberately
-restricted to the declared small scope.
-
-## Interactive acceptance / try it yourself (ISSUE-006)
-
-Install the project from this worktree to enable both the console script and
-the pinned general-English frequency source:
-
-```bash
-python3 -m pip install .
-```
-
-The equivalent module entrypoint is available from the repository root. The
-three explicit hypothesis/prior modes are:
-
-- `full-uniform` — PRIMARY STRICT FAIRNESS; all 12,974 legal words, uniform.
-- `full-frequency` — PRIMARY HUMAN-LIKE EXPLORATORY; all 12,974 legal words,
-  positive `wordfreq==3.1.1` English Zipf-frequency mass, with no scheduled
-  answer-list membership.
-- `curated-2315` — DIAGNOSTIC / ANSWER-LIST-AWARE only; the historical 2,315
-  candidate-answer support, retained for comparison and not the primary
-  fairness claim.
-
-Simulate a target known to the OWNER. `aahed` is legal but outside the curated
-2,315 list, so it is a useful fairness smoke test:
-
-```bash
-bayesian-hardle simulate --target aahed --mode full-uniform --policy max-ig
-python3 -m bayesian_hardle.cli simulate --target aahed \
-  --mode full-frequency --policy map --max-guesses 20
-```
-
-The solver prints the mode label, policy, guess, Hardle feedback, remaining
-candidate count, entropy in bits, decision time in milliseconds, and the top
-five posterior words on every turn. Max-IG builds or reuses a vocabulary-keyed
-exact `uint8` matrix under `.cache/bayesian_hardle/`; the matrix is about
-160.6 MiB for full support.
-
-For live assistance, enter the two numbers returned by the real website. A
-malformed or posterior-impossible observation is rejected without changing the
-belief state; `q`, Ctrl-D, or Ctrl-C exits cleanly:
-
-```bash
-python3 -m bayesian_hardle.cli live --mode full-uniform --policy max-ig
-# at each prompt, enter for example: 0 0
-```
-
-Independent policy/mode comparisons are also available:
-
-```bash
-bayesian-hardle compare --target aahed \
-  --modes full-uniform full-frequency \
-  --policies map max-ig --max-guesses 10
-```
-
-The benchmark and acceptance transcript are kept in
-[`experiments/results/issue_006_fair_client_summary.md`](experiments/results/issue_006_fair_client_summary.md),
-[`experiments/results/issue_006_fair_client.json`](experiments/results/issue_006_fair_client.json),
-and [`docs/acceptance/issue_006_sample_transcript.md`](docs/acceptance/issue_006_sample_transcript.md).
-The frequency prior is a reproducible human-like heuristic, not a claim about
-the true Hardle target-generating process.
-
-To refresh the machine-readable performance evidence after installing the
-project dependencies:
-
-```bash
-PYTHONPATH=src python3 experiments/issue_006_fair_client.py
-```
-
-## 交互式浏览器验收（ISSUE-007/008/009）
-
-在本仓库中用 uv 启动本地可视化验收界面：
+Run the interactive app:
 
 ```bash
 uv run --with . streamlit run src/bayesian_hardle/streamlit_app.py
 ```
 
-打开 Streamlit 输出的本地地址。在 `策略比较` 页顶部的 `实验范围` 选择：
+## Experiments
 
-- `全词表（公平主实验）`：继续选择 `full-uniform`、`full-frequency` 或 `curated-2315`，只运行 Random / MAP / Max-IG；Exact 会显示为不可用，并标明“仅小词表精确实验可用”。
-- `小词表（Exact 实验）`：固定使用 ISSUE-004 accepted fixture，包含 5 个候选目标、10 个合法猜词（含仓库自动加入的 `covid`、`padel`）和 3 回合上限。目标输入必须是 `awake`、`cigar`、`humph`、`rebut` 或 `sissy` 之一。
+The `experiments/` directory contains controlled comparisons and performance studies. The full Random/MAP benchmark uses 2,315 candidate answers and 12,974 legal guesses. Full Max-IG uses the same vocabulary scope. Exact Bellman-style planning is intentionally restricted to smaller declared scopes because its computational cost grows rapidly with horizon and action space.
 
-要在一个目标上运行四种策略：选择 `小词表（Exact 实验）`，输入一个候选目标（例如 `awake`），保留默认勾选的 Random / MAP / Max-IG / Exact Bayes-optimal，然后点击 `运行策略比较`。结果会按策略并列显示；每张表包含每回合猜词、反馈、剩余候选数、单步与累计决策时间、状态和回合数。`人类对战求解器`页仍只提供可扩展的三种策略，并明确提示 Exact 比较位于小词表策略比较页。
+The repository keeps exact and scalable methods distinct: performance shortcuts are tested against the exact semantics they claim to preserve rather than presented as interchangeable approximations.
 
-全词表的 `精选 2,315（curated-2315）` 明确标为诊断/答案列表感知模式，不代表主要公平模式。
+## Repository layout
 
-`精确贝叶斯最优（Exact Bayes-optimal）`在全词表范围会显示为不可用；它只在上述小词表实验中执行，且复用已接受的精确规划语义。
+- `src/bayesian_hardle/` — solver, game, application, and CLI code.
+- `tests/` — behavioral and regression tests.
+- `experiments/` — reproducible experiment runners and selected results.
+- `scripts/` — deterministic data-preparation helpers.
+- `data/wordlists/` — provenance metadata; generated word lists are local-only.
+- `docs/` — architecture and research notes.
+
+## Data provenance
+
+The experiments use a historical Wordle answer list published by cfreshman and a legal-guess list from Al Sweigart's `wordletools`, plus the Hardle-specific additions `covid` and `padel`. Source URLs, pinned revisions, counts, and hashes are recorded in `data/wordlists/provenance.json`.
+
+Because the redistribution status of the historical Wordle list is not explicit, this repository records provenance and fetches the inputs from their pinned sources instead of vendoring the list contents.
+
+## Limitations
+
+- Exact finite-horizon planning is computationally expensive and is not claimed to scale to the full action space at arbitrary horizons.
+- Results depend on the pinned vocabulary and game semantics; changing either changes the decision problem.
+- The project studies algorithmic decision-making in a word-feedback environment; it is not intended as a claim about human cognition.
+
+## License
+
+Code in this repository is released under the MIT License. External word lists fetched by the preparation script remain subject to their respective source terms.

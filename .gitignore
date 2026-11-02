@@ -16,3 +16,7 @@ build/
 experiments/outputs/
 *.log
 .DS_Store
+
+# Generated from pinned upstream sources by scripts/fetch_wordlists.py.
+data/wordlists/wordle-candidate-answers.txt
+data/wordlists/wordle-legal-guesses.txt
